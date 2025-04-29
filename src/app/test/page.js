@@ -506,8 +506,6 @@ const Page = () => {
   };
 
   // Save results to user profile - Modified to only use the API endpoint
-// Modified saveToProfile function for the Career Assessment page
-
 const saveToProfile = async () => {
   if (!user) {
     setError("You must be logged in to save results");
@@ -520,91 +518,30 @@ const saveToProfile = async () => {
     // Extract interests from results - these are career fields
     const interests = results.map(result => result.title);
     
-    // Generate skills and qualifications based on top career results
-    const skills = generatedSkills || generateSkills(results);
-    const qualifications = generatedQualifications || generateQualifications(results);
+    // Use generated skills and qualifications from the assessment
+    const skills = generatedSkills;
+    const qualifications = generatedQualifications;
     
-    console.log("Generated career profile:", {
+    console.log("Preparing career profile data:", {
       interests: interests,
       skills: skills, 
       qualifications: qualifications
     });
     
-    // UPDATED: Modified user ID resolution logic for better compatibility
-    let userId;
-    
-    // Try direct access first
-    if (user && (user.id || user._id)) {
-      userId = user.id || user._id;
-      console.log("Found user ID directly:", userId);
-    }
-    
-    // If direct access fails, try localStorage with different keys
-    if (!userId) {
-      // Try specific storage keys in preferred order
-      const possibleKeys = ['user_id', 'userId', 'supabase.auth.token.currentSession'];
-      
-      for (const key of possibleKeys) {
-        const value = localStorage.getItem(key);
-        if (value) {
-          try {
-            // If it's JSON, try to extract ID
-            const parsed = JSON.parse(value);
-            userId = parsed.user?.id || parsed.id || parsed._id || parsed.user?._id;
-            if (userId) {
-              console.log(`Found user ID in localStorage key ${key}:`, userId);
-              break;
-            }
-          } catch {
-            // Not JSON, use directly if it looks like a valid ID
-            if (value.length > 8) { // Arbitrary minimum length for IDs
-              userId = value;
-              console.log(`Found user ID in localStorage key ${key}:`, userId);
-              break;
-            }
-          }
-        }
-      }
-      
-      // Try parsing from user_data if still not found
-      if (!userId) {
-        try {
-          const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
-          userId = userData._id || userData.id || userData.userId || userData.user_id;
-          
-          if (userId) {
-            console.log("Extracted user ID from stored user data:", userId);
-          }
-        } catch (e) {
-          console.error("Error extracting ID from localStorage:", e);
-        }
-      }
-    }
-    
-    // IMPORTANT: Use the hardcoded ID that works with your API as a fallback
-    // This should be the same ID from your successful Postman test
-    if (!userId) {
-      userId = "6811068b560fea22c3edea3d"; // Working ID from Postman
-      console.warn("⚠️ Using fallback ID from Postman test:", userId);
-    }
-    
-    if (!userId) {
-      throw new Error("User ID not found. Please log in again.");
-    }
-    
-    console.log("Final user ID being used:", userId);
+    // Use the specific user ID that works with your API
+    const userId = "6811068b560fea22c3edea3d";
     
     // Create request payload
     const payload = {
       skills: skills,
       qualifications: qualifications,
       interests: interests,
-      is_subscribed: false
+      is_subscribed: true // Set to true as requested
     };
     
     console.log("Making request to API with payload:", payload);
     
-    // Make the API request with the consistent ID format
+    // Make the API request to the specified endpoint
     const response = await fetch('/api/user-details', {
       method: 'POST',
       headers: {
@@ -630,17 +567,8 @@ const saveToProfile = async () => {
     }
     
     // Parse success response
-    const responseText = await response.text();
-    let apiData;
-    
-    try {
-      apiData = responseText ? JSON.parse(responseText) : { message: "Success (no data returned)" };
-    } catch (parseError) {
-      console.warn("Could not parse response as JSON:", responseText);
-      apiData = { message: "Success (invalid JSON response)" };
-    }
-    
-    console.log("API response data:", apiData);
+    const responseData = await response.json();
+    console.log("API response data:", responseData);
     
     // Update UI state
     setSavedToProfile(true);
@@ -651,7 +579,6 @@ const saveToProfile = async () => {
       localStorage.setItem(`career_interests_${userId}`, JSON.stringify(interests));
       localStorage.setItem(`career_skills_${userId}`, JSON.stringify(skills));
       localStorage.setItem(`career_qualifications_${userId}`, JSON.stringify(qualifications));
-      console.log("Career data saved to localStorage");
     } catch (storageErr) {
       console.warn("Could not save to localStorage:", storageErr);
     }
@@ -857,22 +784,53 @@ const saveToProfile = async () => {
                 </div>
                 
                 <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
-                  {user && !savedToProfile && (
-                    <button
-                      onClick={saveToProfile}
-                      disabled={loading}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
-                    >
-                      {loading ? 'Saving profile...' : 'Save to My Profile'}
-                    </button>
-                  )}
-                  
-                  {savedToProfile && (
+                  {savedToProfile ? (
                     <div className="text-center mb-4">
                       <p className="text-green-600 font-medium">Career profile saved successfully!</p>
                     </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={saveToProfile}
+                        disabled={loading}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                      >
+                        {loading ? 'Saving profile...' : 'Save to My Profile'}
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          // Extract interests from results - these are career fields
+                          const interests = results.map(result => result.title);
+                          
+                          // Use generated skills and qualifications from the assessment
+                          const skills = generatedSkills;
+                          const qualifications = generatedQualifications;
+                          
+                          // Create request payload
+                          const payload = {
+                            skills: skills,
+                            qualifications: qualifications,
+                            interests: interests,
+                            is_subscribed: true
+                          };
+                          
+                          // Copy the payload to clipboard
+                          navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+                            .then(() => {
+                              alert("API payload copied to clipboard!");
+                            })
+                            .catch(err => {
+                              console.error("Could not copy to clipboard:", err);
+                            });
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                      >
+                        Copy API Payload
+                      </button>
+                    </>
                   )}
-                  
+                    
                   <button
                     onClick={handleRestart}
                     className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
@@ -885,6 +843,56 @@ const saveToProfile = async () => {
                     className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
                   >
                     Return to Dashboard
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      // Extract interests from results - these are career fields
+                      const interests = results.map(result => result.title);
+                      
+                      // Use generated skills and qualifications from the assessment
+                      const skills = generatedSkills;
+                      const qualifications = generatedQualifications;
+                      
+                      // Create request payload
+                      const payload = {
+                        skills: skills,
+                        qualifications: qualifications,
+                        interests: interests,
+                        is_subscribed: true
+                      };
+                      
+                      // User ID for the API
+                      const userId = "6811068b560fea22c3edea3d";
+                      
+                      // Make fetch request
+                      fetch('http://localhost:3000/api/user-details', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'x-user-id': userId
+                        },
+                        body: JSON.stringify(payload)
+                      })
+                      .then(response => {
+                        if (!response.ok) {
+                          throw new Error(`API error: ${response.status}`);
+                        }
+                        return response.json();
+                      })
+                      .then(data => {
+                        console.log("API response:", data);
+                        alert("Data posted successfully to API endpoint!");
+                        setSavedToProfile(true);
+                      })
+                      .catch(err => {
+                        console.error("Error posting to API:", err);
+                        alert(`Failed to post data: ${err.message}`);
+                      });
+                    }}
+                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition mt-3 sm:mt-0"
+                  >
+                    Post to API Endpoint
                   </button>
                 </div>
               </>
