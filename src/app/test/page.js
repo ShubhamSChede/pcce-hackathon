@@ -628,7 +628,7 @@ DO NOT include weights or other fields - just category, question and options.`
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-6  mx-auto">
       <h1 className="text-3xl font-bold mb-4 text-center">Career Guidance Quiz</h1>
       
       {!quizStarted ? (
@@ -643,34 +643,112 @@ DO NOT include weights or other fields - just category, question and options.`
           </button>
         </div>
       ) : careerInsight ? (
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-2xl font-bold mb-4">Your Career Insights</h2>
-          
-          <div className="mb-6 p-4 bg-gray-50 rounded border-l-4 border-blue-500">
-            <div className="whitespace-pre-line">{careerInsight}</div>
+        <div className="bg-white shadow-lg rounded-lg p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-blue-700">Your Career Insights</h2>
+            <button 
+              onClick={() => window.print()}
+              className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded flex items-center"
+              title="Print or save as PDF"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
+              </svg>
+              Save/Print
+            </button>
           </div>
           
-          <h3 className="text-xl font-semibold mb-3">Top Career Fields</h3>
-          <div className="space-y-2 mb-6">
-            {Object.entries(careerScores)
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 5)
-              .map(([field, score], index) => (
-                <div key={field} className="flex items-center">
-                  <div className="w-6 text-gray-500">{index + 1}.</div>
-                  <div className="flex-grow">{careerFields[field]}</div>
-                  <div className="w-12 text-right font-medium">{score} pts</div>
+          <div className="border-b border-gray-200 mb-6 pb-2">
+            <p className="text-sm text-gray-500">Based on your quiz responses, here's your personalized career guidance</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Left column with insights */}
+            <div className="space-y-6 grid grid-cols-2">
+              {careerInsight.split('##').filter(section => section.trim()).map((section, index) => {
+                const lines = section.trim().split('\n');
+                const title = lines[0] || '';
+                const content = lines.slice(1).join('\n');
+                
+                return (
+                  <div key={index} className="b rounded-lg p-4 shadow-sm">
+                    <div className=" flex items-center mb-3">
+                      {/* Icons for different sections */}
+                      {title.includes('Key Skills') && (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      )}
+                      {title.includes('Career Interests') && (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                        </svg>
+                      )}
+                      {title.includes('Qualifications') && (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                          <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+                        </svg>
+                      )}
+                      {title.includes('Recommendations') && (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      )}
+                      <h3 className="font-semibold text-lg">{title.trim()}</h3>
+                    </div>
+                    <div className="pl-7">
+                      <div dangerouslySetInnerHTML={{__html: content.replace(/•\s(.*)/g, '<div class="flex items-start my-2"><span class="inline-block w-2 h-2 rounded-full bg-blue-400 mt-1.5 mr-2"></span><span>$1</span></div>')}} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Right column with top career fields */}
+            <div>
+              <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-100">
+                <h3 className="text-xl font-semibold mb-3 text-blue-800">Top Career Fields</h3>
+                <p className="text-sm text-gray-600 mb-4">These fields align most closely with your preferences and strengths.</p>
+                <div className="space-y-4">
+                  {Object.entries(careerScores)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([field, score], index) => {
+                      // Calculate percentage for visual bar (relative to highest score)
+                      const maxScore = Object.entries(careerScores).sort((a, b) => b[1] - a[1])[0][1];
+                      const percentage = Math.round((score / maxScore) * 100);
+                      
+                      return (
+                        <div key={field} className="bg-white p-3 rounded shadow-sm">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="font-medium">{careerFields[field]}</div>
+                            <div className="text-sm font-bold text-blue-700">{score} pts</div>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className={`h-2.5 rounded-full ${index === 0 ? 'bg-blue-600' : 'bg-blue-400'}`}
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  }
                 </div>
-              ))
-            }
+              </div>
+              
+              <div className="mt-6 text-center">
+                <button 
+                  onClick={handleRestartQuiz}
+                  className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  Take Quiz Again
+                </button>
+              </div>
+            </div>
           </div>
-          
-          <button 
-            onClick={handleRestartQuiz}
-            className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
-          >
-            Take Quiz Again
-          </button>
         </div>
       ) : (
         <div className="bg-white shadow-md rounded-lg p-6">
