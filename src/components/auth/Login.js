@@ -43,16 +43,21 @@ export default function Login() {
 
       // Store user data for session management
       if (data.user) {
+        // Log the full user object to inspect structure
+        console.log("Complete user data from login:", data.user);
+        
         // Store complete user data in localStorage
         localStorage.setItem('user_data', JSON.stringify(data.user));
         
-        // Also store the ID specifically for easier access
-        if (data.user.id || data.user._id) {
-          localStorage.setItem('user_id', data.user.id || data.user._id);
-          console.log("Saved user ID to localStorage:", data.user.id || data.user._id);
-        }
+        // Find and store the correct ID (MongoDB usually uses _id)
+        const userId = data.user._id || data.user.id;
         
-        console.log("User data saved to localStorage:", data.user);
+        if (userId) {
+          localStorage.setItem('user_id', userId);
+          console.log("Saved user ID to localStorage:", userId);
+        } else {
+          console.warn("Could not find user ID in response:", data.user);
+        }
         
         // Also set up a session if you need it for existing components
         try {
