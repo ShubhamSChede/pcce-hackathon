@@ -327,6 +327,16 @@ const Page = () => {
   const [savedToProfile, setSavedToProfile] = useState(false);
   const [generatedSkills, setGeneratedSkills] = useState([]);
   const [generatedQualifications, setGeneratedQualifications] = useState([]);
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUserId = localStorage.getItem('user_id');
+      if (storedUserId) {
+        setUserId(storedUserId);
+      }
+    }
+  }, []);
 
   // Handle answer selection
   const handleAnswer = (questionId, option) => {
@@ -505,91 +515,88 @@ const Page = () => {
     return skills.slice(0, 6); // Limit to max 6 skills
   };
 
-  // Save results to user profile - Modified to only use the API endpoint
-const saveToProfile = async () => {
-  if (!user) {
-    setError("You must be logged in to save results");
-    return;
-  }
-  
-  setLoading(true);
-  
-  try {
-    // Extract interests from results - these are career fields
-    const interests = results.map(result => result.title);
-    
-    // Use generated skills and qualifications from the assessment
-    const skills = generatedSkills;
-    const qualifications = generatedQualifications;
-    
-    console.log("Preparing career profile data:", {
-      interests: interests,
-      skills: skills, 
-      qualifications: qualifications
-    });
-    
-    // Use the specific user ID that works with your API
-    const userId = "6811068b560fea22c3edea3d";
-    
-    // Create request payload
-    const payload = {
-      skills: skills,
-      qualifications: qualifications,
-      interests: interests,
-      is_subscribed: true // Set to true as requested
-    };
-    
-    console.log("Making request to API with payload:", payload);
-    
-    // Make the API request to the specified endpoint
-    const response = await fetch('/api/user-details', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId // Send ID in the required header
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    console.log("Response status:", response.status);
-    
-    // Handle the response
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Error response:", errorText);
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        throw new Error(errorData.error || `API error: ${response.status}`);
-      } catch (parseError) {
-        throw new Error(`API error: ${response.status}. ${errorText || ''}`);
-      }
+  // Save results to user profile
+  const saveToProfile = async () => {
+    if (!userId) {
+      setError("You must be logged in to save results");
+      return;
     }
     
-    // Parse success response
-    const responseData = await response.json();
-    console.log("API response data:", responseData);
+    setLoading(true);
     
-    // Update UI state
-    setSavedToProfile(true);
-    setError(null);
-    
-    // Save to localStorage as backup
     try {
-      localStorage.setItem(`career_interests_${userId}`, JSON.stringify(interests));
-      localStorage.setItem(`career_skills_${userId}`, JSON.stringify(skills));
-      localStorage.setItem(`career_qualifications_${userId}`, JSON.stringify(qualifications));
-    } catch (storageErr) {
-      console.warn("Could not save to localStorage:", storageErr);
+      // Extract interests from results - these are career fields
+      const interests = results.map(result => result.title);
+      
+      // Use generated skills and qualifications from the assessment
+      const skills = generatedSkills;
+      const qualifications = generatedQualifications;
+      
+      console.log("Preparing career profile data:", {
+        interests: interests,
+        skills: skills, 
+        qualifications: qualifications
+      });
+      
+      // Create request payload
+      const payload = {
+        skills: skills,
+        qualifications: qualifications,
+        interests: interests,
+        is_subscribed: true // Set to true as requested
+      };
+      
+      console.log("Making request to API with payload:", payload);
+      
+      // Make the API request to the specified endpoint
+      const response = await fetch('/api/user-details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId // Send ID in the required header
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      console.log("Response status:", response.status);
+      
+      // Handle the response
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `API error: ${response.status}`);
+        } catch (parseError) {
+          throw new Error(`API error: ${response.status}. ${errorText || ''}`);
+        }
+      }
+      
+      // Parse success response
+      const responseData = await response.json();
+      console.log("API response data:", responseData);
+      
+      // Update UI state
+      setSavedToProfile(true);
+      setError(null);
+      
+      // Save to localStorage as backup
+      try {
+        localStorage.setItem(`career_interests_${userId}`, JSON.stringify(interests));
+        localStorage.setItem(`career_skills_${userId}`, JSON.stringify(skills));
+        localStorage.setItem(`career_qualifications_${userId}`, JSON.stringify(qualifications));
+      } catch (storageErr) {
+        console.warn("Could not save to localStorage:", storageErr);
+      }
+      
+    } catch (err) {
+      console.error("Error saving results:", err);
+      setError(`Problem saving results: ${err.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
-    
-  } catch (err) {
-    console.error("Error saving results:", err);
-    setError(`Problem saving results: ${err.message || 'Unknown error'}`);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Restart the assessment
   const handleRestart = () => {

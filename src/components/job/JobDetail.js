@@ -14,6 +14,17 @@ export default function JobDetail({ jobId }) {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [showSaveForm, setShowSaveForm] = useState(false);
+  const [userId, setUserId] = useState(null); // Add userId state
+
+  // Get userId from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUserId = localStorage.getItem('user_id');
+      if (storedUserId) {
+        setUserId(storedUserId);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -24,10 +35,7 @@ export default function JobDetail({ jobId }) {
       }
 
       try {
-        // Get user ID for authentication if available
-        const userId = user?.id || user?._id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
-        
-        // Set up headers
+        // Use userId from state instead of user object
         const headers = {};
         if (userId) {
           headers['x-user-id'] = userId;
@@ -83,11 +91,11 @@ export default function JobDetail({ jobId }) {
     };
 
     fetchJobDetails();
-  }, [jobId, user]);
+  }, [jobId, userId]); // Update dependency to use userId instead of user
 
   // Save job interest
   const saveJobInterest = async () => {
-    if (!user) {
+    if (!userId) {
       setSaveMessage('Please sign in to save this job');
       return;
     }
@@ -96,9 +104,6 @@ export default function JobDetail({ jobId }) {
     setSaveMessage('');
     
     try {
-      // Get user ID
-      const userId = user.id || user._id || localStorage.getItem('user_id');
-      
       if (!userId) {
         throw new Error('User ID not found');
       }
@@ -230,7 +235,7 @@ export default function JobDetail({ jobId }) {
       <div className="flex justify-between items-start mb-4">
         <h1 className="text-3xl font-bold">{job.title}</h1>
         
-        {user && (
+        {userId && (
           <button 
             onClick={toggleSaveForm}
             className={`flex items-center px-3 py-2 rounded-lg ${
@@ -264,7 +269,7 @@ export default function JobDetail({ jobId }) {
       )}
       
       {/* Job Save Form */}
-      {showSaveForm && user && (
+      {showSaveForm && userId && (
         <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
           <h3 className="text-lg font-medium mb-3">Save This Job</h3>
           
@@ -459,7 +464,7 @@ export default function JobDetail({ jobId }) {
         )}
       </div>
       
-      {!user && (
+      {!userId && (
         <div className="mt-8 bg-gray-50 p-4 rounded border border-gray-200">
           <p className="text-sm text-gray-700">
             <Link href="/login" className="text-indigo-600 font-medium hover:text-indigo-800">

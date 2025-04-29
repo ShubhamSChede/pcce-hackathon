@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import Profile from '@/components/dashboard/profile';
 import CareerDetails from '@/components/dashboard/careerdetails';
 import MeetingScheduler from '@/components/dashboard/meetingscheduler';
+import SavedJobs from '@/components/dashboard/SavedJobs';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -52,8 +53,9 @@ export default function DashboardPage() {
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Profile card in the left column */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-2">
               <Profile />
+              <SavedJobs />
             </div>
             
             {/* Career details in the remaining space */}
