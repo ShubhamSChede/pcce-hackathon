@@ -1,10 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/AuthContext';
 import Navbar from '@/components/Navbar';
 
 export default function ProfessionalLearningRoadmap() {
-  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [roadmapData, setRoadmapData] = useState(null);
@@ -225,7 +223,7 @@ export default function ProfessionalLearningRoadmap() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Add the Navbar at the top */}
-      <Navbar user={user} />
+      <Navbar />
       
       <div className="py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">

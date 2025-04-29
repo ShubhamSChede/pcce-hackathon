@@ -1,10 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/AuthContext';
 import Navbar from '@/components/Navbar';
 
 export default function SuperMarioLearningGame() {
-  const { user } = useAuth(); // Add this line to get user for Navbar
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [roadmapData, setRoadmapData] = useState(null);
@@ -245,7 +243,7 @@ export default function SuperMarioLearningGame() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-200 to-sky-400 relative overflow-hidden">
       {/* Add Navbar component */}
-      <Navbar user={user} />
+      <Navbar />
       
       {/* Sky background with clouds */}
       <div className="absolute inset-0 z-0">

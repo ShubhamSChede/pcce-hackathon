@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/AuthContext';
 import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
 
@@ -317,7 +316,6 @@ const careerPaths = {
 };
 
 const Page = () => {
-  const { user } = useAuth();
   const router = useRouter();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -679,7 +677,7 @@ const saveToProfile = async () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar user={user} />
+      <Navbar/>
       
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 pt-20">
         <h1 className="text-3xl font-bold mb-4 text-center text-indigo-600">Career Guidance Assessment</h1>
