@@ -12,8 +12,9 @@ export async function middleware(req) {
   // Check if this is a protected route (adjust these routes as needed)
   const isProtectedRoute = 
     req.nextUrl.pathname.startsWith('/dashboard') || 
-    req.nextUrl.pathname.startsWith('/profile');
-  
+    req.nextUrl.pathname.startsWith('/profile') ||
+    req.nextUrl.pathname.startsWith('/test');
+
   const isAuthRoute = 
     req.nextUrl.pathname.startsWith('/login') || 
     req.nextUrl.pathname.startsWith('/signup');
@@ -35,5 +36,12 @@ export async function middleware(req) {
 
 // Specify which routes this middleware should run on
 export const config = {
-  matcher: ['/dashboard/:path*', '/profile/:path*', '/login', '/signup'],
+  matcher: [
+    '/dashboard/:path*', 
+    '/profile/:path*', 
+    '/login', 
+    '/signup', 
+    '/test',
+    '/jobs/:path*'  // Add this line to include job pages
+  ],
 };

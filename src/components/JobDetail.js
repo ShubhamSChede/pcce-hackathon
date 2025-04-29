@@ -1,64 +1,81 @@
-// src/app/components/JobDetail.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function JobDetail({ jobId }) {
+  const router = useRouter();
   const supabase = createClientComponentClient();
+  const { user } = useAuth();
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
   const [jobInterest, setJobInterest] = useState(null);
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState('');
 
+  // Debug function to log object details
+  const debugLog = (obj) => {
+    try {
+      return JSON.stringify(obj, null, 2);
+    } catch (e) {
+      return `[Could not stringify: ${e.message}]`;
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
-      // Get user session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUser(session.user);
-      }
-
-      // Fetch job details
-      const { data: jobData, error: jobError } = await supabase
-        .from('job_opportunities')
-        .select('*')
-        .eq('id', jobId)
-        .single();
-
-      if (jobError) {
-        console.error('Error fetching job:', jobError);
-        setLoading(false);
-        return;
-      }
-
-      setJob(jobData);
-
-      // If user is authenticated, fetch their interest for this job
-      if (session) {
-        const { data: interestData } = await supabase
-          .from('user_job_interests')
+      try {
+        // Fetch job details
+        const { data: jobData, error: jobError } = await supabase
+          .from('job_opportunities')
           .select('*')
-          .eq('user_id', session.user.id)
-          .eq('job_id', jobId)
+          .eq('id', jobId)
           .single();
 
-        if (interestData) {
-          setJobInterest(interestData.status);
-          setNotes(interestData.notes || '');
+        if (jobError) {
+          console.error('Error fetching job:', jobError);
+          setLoading(false);
+          return;
         }
-      }
 
-      setLoading(false);
+        setJob(jobData);
+
+        // If user is authenticated, fetch their interest for this job
+        if (user) {
+          console.log("User is authenticated:", user.id);
+          const { data: interestData, error: interestError } = await supabase
+            .from('user_job_interests')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('job_id', jobId)
+            .single();
+
+          if (interestError && interestError.code !== 'PGRST116') {
+            console.error('Error fetching interest data:', interestError);
+          }
+
+          if (interestData) {
+            console.log("Found user interest:", interestData);
+            setJobInterest(interestData.status);
+            setNotes(interestData.notes || '');
+          }
+        } else {
+          console.log("No authenticated user detected");
+        }
+      } catch (err) {
+        console.error("Error in fetchData:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     if (jobId) {
       fetchData();
     }
-  }, [supabase, jobId]);
+  }, [jobId, supabase, user]);
 
   const handleJobInterest = async (status) => {
     if (!user) {
@@ -70,45 +87,61 @@ export default function JobDetail({ jobId }) {
     setMessage('');
 
     try {
+      // First, log for debugging
+      console.log('Setting job interest:', { jobId, userId: user.id, status });
+      
+      let result;
+      
       if (jobInterest) {
         if (jobInterest === status) {
           // Remove interest if clicking the same status
-          await supabase
+          result = await supabase
             .from('user_job_interests')
             .delete()
             .eq('user_id', user.id)
             .eq('job_id', jobId);
           
+          if (result.error) throw result.error;
+          
           setJobInterest(null);
           setNotes('');
         } else {
           // Update interest status
-          await supabase
+          result = await supabase
             .from('user_job_interests')
             .update({ 
-              status, 
+              status,
+              notes: notes,
               updated_at: new Date().toISOString() 
             })
             .eq('user_id', user.id)
             .eq('job_id', jobId);
           
+          if (result.error) throw result.error;
+          
           setJobInterest(status);
         }
       } else {
-        // Insert new interest
-        await supabase
+        // Insert new interest - with explicit type conversion to be safe
+        result = await supabase
           .from('user_job_interests')
           .insert({
             user_id: user.id,
             job_id: jobId,
-            status,
+            status: status,
+            notes: notes || null
           });
+        
+        if (result.error) throw result.error;
         
         setJobInterest(status);
       }
+      
+      console.log('Operation result:', result);
       setMessage(`Job marked as ${status}`);
     } catch (error) {
-      setMessage(`Error updating job interest: ${error.message}`);
+      console.error('Error in handleJobInterest:', error);
+      setMessage(`Error updating job interest: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -136,7 +169,8 @@ export default function JobDetail({ jobId }) {
       if (error) throw error;
       setMessage('Notes saved successfully');
     } catch (error) {
-      setMessage(`Error saving notes: ${error.message}`);
+      console.error('Error in saveNotes:', error);
+      setMessage(`Error saving notes: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -183,6 +217,12 @@ export default function JobDetail({ jobId }) {
           </div>
         )}
       </div>
+
+      {message && (
+        <div className={`mb-6 p-3 text-sm rounded ${message.includes('Error') ? 'text-red-600 bg-red-100' : 'text-green-600 bg-green-100'}`}>
+          {message}
+        </div>
+      )}
       
       <div className="mb-6">
         <h3 className="text-lg font-medium mb-2">Tags</h3>
@@ -205,12 +245,6 @@ export default function JobDetail({ jobId }) {
           )}
         </div>
       </div>
-      
-      {message && (
-        <div className={`mb-4 p-3 text-sm ${message.includes('Error') ? 'text-red-600 bg-red-100' : 'text-green-600 bg-green-100'} rounded`}>
-          {message}
-        </div>
-      )}
       
       {user && (
         <>
@@ -273,6 +307,16 @@ export default function JobDetail({ jobId }) {
             </div>
           )}
         </>
+      )}
+
+      {!user && (
+        <div className="mt-8 p-4 bg-gray-50 border-l-4 border-indigo-500 rounded">
+          <p className="text-gray-700">
+            <Link href="/login" className="text-indigo-600 font-medium hover:text-indigo-800">
+              Sign in
+            </Link> to save this job or mark your interest.
+          </p>
+        </div>
       )}
     </div>
   );

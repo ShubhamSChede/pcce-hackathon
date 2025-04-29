@@ -2,301 +2,312 @@
 
 import { useAuth } from '@/lib/AuthContext';
 import { useEffect, useState } from 'react';
-import LogoutButton from '@/components/auth/LogoutButton';
-import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
+import Navbar from '@/components/Navbar';
 
 export default function DashboardPage() {
-  const { user, getUserProfile } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const { user, loading: authLoading } = useAuth(); // Get both user and loading state from auth context
   const [userDetails, setUserDetails] = useState(null);
+  const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [savedJobs, setSavedJobs] = useState([]);
-  const [appliedJobs, setAppliedJobs] = useState([]);
-  const [recommendedCareers, setRecommendedCareers] = useState([]);
+  const [error, setError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState({});
   const supabase = createClientComponentClient();
+  const router = useRouter();
+  
+  // Log authentication state on every render for debugging
+  console.log("Auth state:", { user: user ? "Authenticated" : "Not authenticated", authLoading });
 
   useEffect(() => {
+    // Wait until auth is fully loaded before proceeding
+    if (authLoading) {
+      console.log("Auth is still loading, waiting...");
+      return;
+    }
+    
+    // If we have no user after auth has loaded, we can stop loading but don't redirect
+    if (!user) {
+      console.log("Auth finished loading but no user found");
+      setLoading(false);
+      return;
+    }
+    
+    console.log("Auth loaded successfully with user:", user.id);
+
     const fetchData = async () => {
-      if (user) {
-        // Get profile
-        const profileData = await getUserProfile();
-        setProfile(profileData);
+      try {
+        console.log("Fetching data for user:", user.id);
+        
+        // First verify the session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          setError("Session error. Please try logging in again.");
+          return;
+        }
+        
+        // We already have user from useAuth(), so don't redirect if session is null
+        // This handles cases where session might be transitioning or temporarily unavailable
+        // but we still have user context from AuthContext
+        
+        console.log("Active session status:", session ? "Valid" : "Missing", "User ID:", user.id);
         
         // Fetch user details
-        const { data: details } = await supabase
+        const { data: details, error: detailsError } = await supabase
           .from('user_details')
+          .select('skills, interests, qualifications')
+          .eq('id', user.id)
+          .single();
+
+        if (detailsError) {
+          console.error('Error fetching user details:', detailsError);
+          
+          // Not finding the record is acceptable for new users
+          if (detailsError.code === 'PGRST116') {
+            console.log('No user details found, this is normal for new users');
+            setUserDetails({
+              skills: [],
+              interests: [],
+              qualifications: []
+            });
+          }
+        } else {
+          console.log('User details fetched successfully:', details);
+          setUserDetails(details);
+        }
+        
+        // Fetch profile data
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
           
-        setUserDetails(details);
-        
-        // Fetch user's job interests
-        const { data: jobInterests } = await supabase
-          .from('user_job_interests')
-          .select(`
-            *,
-            job_opportunities:job_id (*)
-          `)
-          .eq('user_id', user.id);
-        
-        if (jobInterests) {
-          // Separate saved and applied jobs
-          const saved = jobInterests.filter(item => item.status === 'saved');
-          const applied = jobInterests.filter(item => item.status === 'applied');
+        if (profileError) {
+          console.error('Error fetching profile data:', profileError);
           
-          setSavedJobs(saved);
-          setAppliedJobs(applied);
-        }
-        
-        // Fetch recommended career paths based on user skills
-        if (details && details.skills && details.skills.length > 0) {
-          const { data: careers } = await supabase
-            .from('career_paths')
-            .select('*');
+          // Create a profile if it doesn't exist
+          if (profileError.code === 'PGRST116') {
+            console.log('Profile not found, creating one...');
             
-          if (careers) {
-            // Find careers that match user skills
-            const userSkills = details.skills.map(skill => skill.toLowerCase());
+            // Create basic profile structure
+            const newProfileData = {
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || '',
+              avatar_url: user.user_metadata?.avatar_url || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
             
-            const matchedCareers = careers.map(career => {
-              const requiredSkills = career.required_skills?.map(skill => skill.toLowerCase()) || [];
+            // Insert the new profile - with more detailed error logging
+            console.log('Attempting to insert profile with data:', newProfileData);
+            
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert(newProfileData) // Single object without array brackets may work better with some Supabase versions
+              .select();
               
-              // Count matching skills
-              const matchingSkills = requiredSkills.filter(skill => 
-                userSkills.includes(skill)
-              );
+            console.log('Insert result:', newProfile ? 'Success' : 'Failed', createError ? `Error: ${createError.message}` : '');
               
-              const matchPercentage = requiredSkills.length > 0 
-                ? Math.round((matchingSkills.length / requiredSkills.length) * 100) 
-                : 0;
-                
-              return { ...career, matchPercentage };
+            if (createError) {
+              console.error('Error creating profile:', createError);
+              
+              // Still show some basic profile info even if creation fails
+              setProfileData(newProfileData);
+            } else {
+              console.log('Profile created successfully:', newProfile);
+              setProfileData(newProfile[0]);
+            }
+          } else {
+            // Use basic profile data if there's an error other than "not found"
+            setProfileData({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || 'User',
+              created_at: new Date().toISOString()
             });
-            
-            // Sort by match percentage and take top 3
-            const recommended = matchedCareers
-              .sort((a, b) => b.matchPercentage - a.matchPercentage)
-              .slice(0, 3);
-              
-            setRecommendedCareers(recommended);
           }
+        } else {
+          console.log('Profile data fetched successfully:', profile);
+          setProfileData(profile);
         }
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError("An unexpected error occurred. Please try again later.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchData();
-  }, [user, getUserProfile, supabase]);
+  }, [user, authLoading, supabase, router]);
+
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      setError("Failed to log out. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return <div className="container mx-auto px-4 py-8">Loading...</div>;
   }
 
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+          Please log in to view this page.
+          <button 
+            className="ml-4 bg-blue-500 text-white px-3 py-1 rounded text-sm"
+            onClick={() => router.push('/login')}
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <LogoutButton />
+      <Navbar user={user} />
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      
+      {/* Debug Information Panel - REMOVE IN PRODUCTION */}
+      <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold">Debug Information</h3>
+          <button 
+            className="text-xs px-2 py-1 bg-blue-500 text-white rounded"
+            onClick={async () => {
+              // Attempt to refresh the auth session
+              const { data, error } = await supabase.auth.refreshSession();
+              console.log("Session refresh:", data, error);
+              setDebugInfo(prev => ({ 
+                ...prev, 
+                refreshAttempt: new Date().toISOString(),
+                refreshResult: error ? `Error: ${error.message}` : 'Success'
+              }));
+            }}
+          >
+            Refresh Session
+          </button>
+        </div>
+        <div className="mt-2 text-xs">
+          <div><strong>Auth State:</strong> {user ? 'Authenticated' : 'Not authenticated'}</div>
+          <div><strong>Auth Loading:</strong> {authLoading ? 'Yes' : 'No'}</div>
+          <div><strong>User ID:</strong> {user?.id || 'None'}</div>
+          <div><strong>Component Loading:</strong> {loading ? 'Yes' : 'No'}</div>
+          <div><strong>Profile Data:</strong> {profileData ? 'Loaded' : 'Not loaded'}</div>
+          <div><strong>Profile ID Match:</strong> {profileData?.id === user?.id ? 'Yes' : 'No'}</div>
+          <div><strong>Last Refresh:</strong> {debugInfo.refreshAttempt || 'Never'}</div>
+          <div><strong>Refresh Result:</strong> {debugInfo.refreshResult || 'N/A'}</div>
+        </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Profile Summary */}
-        <div className="lg:col-span-3 p-6 bg-white rounded-lg shadow">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Profile Summary</h2>
-            <Link href="/profile" className="text-indigo-600 hover:text-indigo-800">
-              Edit Profile
-            </Link>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">User Profile</h1>
+        <button
+          onClick={handleLogout}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+        >
+          Logout
+        </button>
+      </div>
+      
+      {/* Profile Card */}
+      {profileData && (
+        <div className="p-6 bg-white rounded-lg shadow mb-6">
+          <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
+          <div className="flex items-start gap-6">
+            {profileData.avatar_url && (
+              <img 
+                src={profileData.avatar_url} 
+                alt="Profile" 
+                className="w-24 h-24 rounded-full object-cover"
+              />
+            )}
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Skills</h3>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {userDetails?.skills?.length > 0 ? (
-                  userDetails.skills.map((skill, index) => (
-                    <span key={index} className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded">
-                      {skill}
-                    </span>
-                  ))
-                ) : (
-                  <p className="text-gray-400 text-sm italic">No skills added yet</p>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Qualifications</h3>
-              <div className="mt-2">
-                {userDetails?.qualifications?.length > 0 ? (
-                  <ul className="text-sm text-gray-600">
-                    {userDetails.qualifications.map((qual, index) => (
-                      <li key={index}>{qual}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-400 text-sm italic">No qualifications added yet</p>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Career Interests</h3>
-              <div className="mt-2">
-                {userDetails?.interests?.length > 0 ? (
-                  <ul className="text-sm text-gray-600">
-                    {userDetails.interests.map((interest, index) => (
-                      <li key={index}>{interest}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-400 text-sm italic">No interests added yet</p>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {(!userDetails || !userDetails.skills || userDetails.skills.length === 0) && (
-            <div className="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-sm">
-              <p>
-                Complete your profile to get personalized career recommendations!{' '}
-                <Link href="/profile" className="text-indigo-600 hover:text-indigo-800 font-medium">
-                  Add your skills and qualifications
-                </Link>
+              <p className="text-lg font-medium">{profileData.full_name || 'Name not set'}</p>
+              <p className="text-gray-600">{profileData.email || user?.email || 'Email not available'}</p>
+              {profileData.website && (
+                <p className="text-blue-600 hover:underline">
+                  <a href={profileData.website} target="_blank" rel="noopener noreferrer">
+                    {profileData.website}
+                  </a>
+                </p>
+              )}
+              <p className="mt-2 text-sm text-gray-500">
+                Member since {new Date(profileData.created_at).toLocaleDateString()}
               </p>
             </div>
-          )}
-        </div>
-        
-        {/* Recommended Career Paths */}
-        <div className="lg:col-span-2 p-6 bg-white rounded-lg shadow">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Recommended Career Paths</h2>
-            <Link href="/careers" className="text-indigo-600 hover:text-indigo-800">
-              View All
-            </Link>
           </div>
-          
-          {recommendedCareers.length > 0 ? (
-            <div className="space-y-4">
-              {recommendedCareers.map(career => (
-                <div key={career.id} className="border rounded-lg p-3">
-                  <h3 className="text-lg font-medium">{career.title}</h3>
-                  
-                  <div className="mt-2 mb-3">
-                    <div className="flex items-center">
-                      <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            career.matchPercentage > 70 ? 'bg-green-500' : 
-                            career.matchPercentage > 40 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${career.matchPercentage}%` }}
-                        ></div>
-                      </div>
-                      <span className="ml-2 text-sm font-medium">{career.matchPercentage}% match</span>
-                    </div>
-                  </div>
-                  
-                  <p className="text-gray-600 text-sm line-clamp-2 mb-3">{career.description}</p>
-                  
-                  <Link 
-                    href={`/careers/${career.id}`} 
-                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                  >
-                    View Details
-                  </Link>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">
-                {userDetails?.skills?.length > 0 
-                  ? "No matching career paths found" 
-                  : "Add skills to get career recommendations"}
-              </p>
-            </div>
-          )}
         </div>
+      )}
+      
+      {/* Skills, Qualifications, Interests */}
+      <div className="p-6 bg-white rounded-lg shadow">
+        <h2 className="text-xl font-semibold mb-4">Career Profile</h2>
         
-        {/* Job Applications */}
-        <div className="p-6 bg-white rounded-lg shadow">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Job Applications</h2>
-            <Link href="/jobs" className="text-indigo-600 hover:text-indigo-800">
-              Find Jobs
-            </Link>
-          </div>
-          
-          {appliedJobs.length > 0 ? (
-            <div className="space-y-3">
-              {appliedJobs.slice(0, 3).map(item => (
-                <div key={item.id} className="border-b pb-3 last:border-b-0">
-                  <h3 className="font-medium">{item.job_opportunities.title}</h3>
-                  <p className="text-gray-600 text-sm">{item.job_opportunities.company}</p>
-                  <div className="mt-1">
-                    <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                      Applied
-                    </span>
-                  </div>
-                </div>
-              ))}
-              
-              {appliedJobs.length > 3 && (
-                <Link 
-                  href="/profile/jobs" 
-                  className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                >
-                  View all {appliedJobs.length} applications
-                </Link>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Skills */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-700 mb-2">Skills</h3>
+            <div className="flex flex-wrap gap-2">
+              {userDetails?.skills?.length > 0 ? (
+                userDetails.skills.map((skill, index) => (
+                  <span key={index} className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                    {skill}
+                  </span>
+                ))
+              ) : (
+                <p className="text-gray-400 italic">No skills added yet</p>
               )}
             </div>
-          ) : (
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No job applications yet</p>
-            </div>
-          )}
-        </div>
-        
-        {/* Saved Jobs */}
-        <div className="p-6 bg-white rounded-lg shadow lg:col-span-2">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Saved Jobs</h2>
-            <Link href="/profile/jobs" className="text-indigo-600 hover:text-indigo-800">
-              View All
-            </Link>
           </div>
           
-          {savedJobs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {savedJobs.slice(0, 4).map(item => (
-                <div key={item.id} className="border rounded-lg p-3">
-                  <h3 className="font-medium">{item.job_opportunities.title}</h3>
-                  <p className="text-gray-600 text-sm">{item.job_opportunities.company}</p>
-                  <p className="text-gray-500 text-xs mt-1">{item.job_opportunities.location}</p>
-                  
-                  <div className="mt-2 flex justify-between items-center">
-                    <span className="inline-block px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded">
-                      Saved
-                    </span>
-                    <Link 
-                      href={`/jobs/${item.job_id}`} 
-                      className="text-indigo-600 hover:text-indigo-800 text-sm"
-                    >
-                      View
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No saved jobs yet</p>
-            </div>
-          )}
+          {/* Qualifications */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-700 mb-2">Qualifications</h3>
+            {userDetails?.qualifications?.length > 0 ? (
+              <ul className="list-disc pl-5 text-gray-600 space-y-1">
+                {userDetails.qualifications.map((qual, index) => (
+                  <li key={index}>{qual}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-400 italic">No qualifications added yet</p>
+            )}
+          </div>
+          
+          {/* Career Interests */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-700 mb-2">Career Interests</h3>
+            {userDetails?.interests?.length > 0 ? (
+              <ul className="list-disc pl-5 text-gray-600 space-y-1">
+                {userDetails.interests.map((interest, index) => (
+                  <li key={index}>{interest}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-400 italic">No career interests added yet</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

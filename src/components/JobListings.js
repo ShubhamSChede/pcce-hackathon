@@ -12,49 +12,88 @@ export default function JobListings() {
   const [userInterests, setUserInterests] = useState({});
   const [user, setUser] = useState(null);
   const [message, setMessage] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalJobs, setTotalJobs] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const jobsPerPage = 6; // Number of jobs to display per page
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       
-      // Fetch jobs
-      const { data: jobsData, error: jobsError } = await supabase
-        .from('job_opportunities')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (jobsError) {
-        console.error('Error fetching jobs:', jobsError);
-        return;
-      }
-
-      setJobs(jobsData || []);
-
-      // If user is authenticated, fetch their job interests
-      if (session) {
-        setUser(session.user);
+      try {
+        // First, get the total count of jobs for pagination
+        const { count, error: countError } = await supabase
+          .from('job_opportunities')
+          .select('*', { count: 'exact', head: true });
         
-        const { data: interestsData, error: interestsError } = await supabase
-          .from('user_job_interests')
-          .select('*')
-          .eq('user_id', session.user.id);
-
-        if (!interestsError && interestsData) {
-          // Convert to object for easy lookup
-          const interests = {};
-          interestsData.forEach(interest => {
-            interests[interest.job_id] = interest.status;
-          });
-          setUserInterests(interests);
+        if (countError) {
+          console.error('Error fetching job count:', countError);
+          return;
         }
-      }
+        
+        setTotalJobs(count || 0);
+        setTotalPages(Math.ceil(count / jobsPerPage));
+        
+        // Calculate range for pagination
+        const from = (currentPage - 1) * jobsPerPage;
+        const to = from + jobsPerPage - 1;
+        
+        // Fetch paginated jobs
+        const { data: jobsData, error: jobsError } = await supabase
+          .from('job_opportunities')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, to);
 
-      setLoading(false);
+        if (jobsError) {
+          console.error('Error fetching jobs:', jobsError);
+          return;
+        }
+
+        setJobs(jobsData || []);
+
+        // If user is authenticated, fetch their job interests
+        if (session) {
+          setUser(session.user);
+          
+          const { data: interestsData, error: interestsError } = await supabase
+            .from('user_job_interests')
+            .select('*')
+            .eq('user_id', session.user.id);
+
+          if (!interestsError && interestsData) {
+            // Convert to object for easy lookup
+            const interests = {};
+            interestsData.forEach(interest => {
+              interests[interest.job_id] = interest.status;
+            });
+            setUserInterests(interests);
+          }
+        }
+      } catch (error) {
+        console.error('Error in fetchData:', error);
+        setMessage('Error loading job listings');
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
-  }, [supabase]);
+  }, [supabase, currentPage]); // Add currentPage as a dependency
 
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      // Scroll to top when changing pages
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Keep your existing handleJobInterest function as is
   const handleJobInterest = async (jobId, status) => {
     if (!user) {
       setMessage('Please sign in to save job interests');
@@ -121,6 +160,15 @@ export default function JobListings() {
           {message}
         </div>
       )}
+      
+      {/* Job count and pagination info */}
+      <div className="mb-4 flex justify-between items-center">
+        <p className="text-sm text-gray-600">
+          {totalJobs === 0 ? 'No jobs found' : 
+            `Showing ${Math.min((currentPage - 1) * jobsPerPage + 1, totalJobs)} - 
+            ${Math.min(currentPage * jobsPerPage, totalJobs)} of ${totalJobs} jobs`}
+        </p>
+      </div>
       
       <div className="grid gap-6 md:grid-cols-2">
         {jobs.length > 0 ? (
@@ -190,6 +238,84 @@ export default function JobListings() {
           </div>
         )}
       </div>
+      
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center">
+          <nav className="inline-flex shadow-sm rounded-md" aria-label="Pagination">
+            {/* Previous page button */}
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border ${
+                currentPage === 1 
+                  ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <span className="sr-only">Previous</span>
+              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+            
+            {/* Page numbers */}
+            {[...Array(totalPages)].map((_, i) => {
+              // Show first page, last page, current page, and pages around current
+              const pageNumber = i + 1;
+              
+              // Logic for which page numbers to show
+              const showPage = 
+                pageNumber === 1 || // First page
+                pageNumber === totalPages || // Last page
+                (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1); // Around current
+              
+              // Show dots if there's a gap in page numbers
+              if (!showPage) {
+                // Show dots only once between gaps
+                if (pageNumber === 2 || pageNumber === totalPages - 1) {
+                  return (
+                    <span key={pageNumber} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700">
+                      ...
+                    </span>
+                  );
+                }
+                return null;
+              }
+              
+              return (
+                <button
+                  key={pageNumber}
+                  onClick={() => handlePageChange(pageNumber)}
+                  className={`relative inline-flex items-center px-4 py-2 border ${
+                    currentPage === pageNumber
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              );
+            })}
+            
+            {/* Next page button */}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border ${
+                currentPage === totalPages 
+                  ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <span className="sr-only">Next</span>
+              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </nav>
+        </div>
+      )}
     </div>
   );
 }

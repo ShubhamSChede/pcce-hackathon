@@ -1,5 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/AuthContext';
 
 // Pre-defined question templates for consistent career assessment
 const questionTemplates = [
@@ -314,6 +317,10 @@ const careerPaths = {
 };
 
 const Page = () => {
+  // Create Supabase client with useRef to ensure stability across renders
+  const { user } = useAuth();
+
+  // Rest of your state variables...
   const [quizStarted, setQuizStarted] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -323,6 +330,15 @@ const Page = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [customQuestions, setCustomQuestions] = useState([]);
+  const [saveStatus, setSaveStatus] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      console.log("User authenticated in Career Quiz:", user.id);
+    } else {
+      console.log("No authenticated user in Career Quiz");
+    }
+  }, [user]);
 
   // Prepare questions - mix template questions with additional hardcoded ones
   const prepareQuestions = async () => {
@@ -356,6 +372,7 @@ const Page = () => {
   };
 
   // Generate additional custom questions using the Gemini API
+  // Modify the generateCustomQuestions function to handle malformed JSON
   const generateCustomQuestions = async () => {
     try {
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent', {
@@ -407,16 +424,47 @@ DO NOT include weights or other fields - just category, question and options.`
       const data = await response.json();
       const responseText = data.candidates[0]?.content?.parts[0]?.text || '';
       
-      // Extract JSON from the response
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const parsedQuestions = JSON.parse(jsonMatch[0]);
-        setCustomQuestions(parsedQuestions);
-      } else {
-        throw new Error('Failed to parse questions from response');
+      // Extract JSON from the response with more robust error handling
+      try {
+        // First try to find a JSON array in the response
+        const jsonMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        
+        if (jsonMatch) {
+          // Try to parse the matched JSON
+          try {
+            const parsedQuestions = JSON.parse(jsonMatch[0]);
+            console.log("Successfully parsed custom questions:", parsedQuestions);
+            setCustomQuestions(parsedQuestions);
+          } catch (parseError) {
+            console.error("Error parsing JSON, attempting cleanup:", parseError);
+            
+            // If parsing fails, try to clean the JSON before parsing
+            let cleanedJson = jsonMatch[0]
+              .replace(/,\s*}/g, '}')            // Remove trailing commas in objects
+              .replace(/,\s*]/g, ']')            // Remove trailing commas in arrays
+              .replace(/\/\/.*?(\r?\n|$)/g, ''); // Remove comments
+              
+            try {
+              const parsedQuestions = JSON.parse(cleanedJson);
+              console.log("Successfully parsed cleaned JSON:", parsedQuestions);
+              setCustomQuestions(parsedQuestions);
+            } catch (secondError) {
+              console.error("Failed to parse even after cleaning:", secondError);
+              // Fall back to default questions
+              setCustomQuestions([]);
+            }
+          }
+        } else {
+          console.warn("No valid JSON array found in response");
+          setCustomQuestions([]);
+        }
+      } catch (err) {
+        console.error('Error processing custom questions response:', err);
+        setCustomQuestions([]);
       }
     } catch (err) {
       console.error('Error generating custom questions:', err);
+      setCustomQuestions([]);
     }
   };
 
@@ -453,7 +501,7 @@ DO NOT include weights or other fields - just category, question and options.`
       const scores = calculateCareerScores();
       setCareerScores(scores);
       
-      // Get the top 3 career fields
+      // Get the top career fields
       const topFields = Object.entries(scores)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
@@ -519,7 +567,21 @@ DO NOT include weights or other fields - just category, question and options.`
       }
       
       const data = await response.json();
-      setCareerInsight(data.candidates[0]?.content?.parts[0]?.text || 'No career insight available');
+      const aiResponse = data.candidates[0]?.content?.parts[0]?.text || 'No career insight available';
+      setCareerInsight(aiResponse);
+      
+      // Save the career guidance if user is logged in
+      if (user) {
+        console.log('User is logged in, saving career guidance...');
+        try {
+          await saveCareerGuidance(aiResponse, topFields, topCareerPaths);
+        } catch (saveError) {
+          console.error('Error saving career guidance:', saveError);
+          // Don't fail the whole process if saving fails
+        }
+      } else {
+        console.log('User not logged in, skipping save');
+      }
     } catch (err) {
       setError(err.message);
       console.error('Error fetching career insight:', err);
@@ -527,7 +589,144 @@ DO NOT include weights or other fields - just category, question and options.`
       setLoading(false);
     }
   };
-
+  
+    // Modified version that skips profile creation if it fails
+// Fixed saveCareerGuidance function
+// Fixed saveCareerGuidance function that actually completes the database operations
+const saveCareerGuidance = async (insight, topFields, topCareerPaths) => {
+  try {
+    setSaveStatus('saving');
+    console.log('Starting to save career guidance for user:', user?.id);
+    
+    if (!user) {
+      console.error('No authenticated user, cannot save data');
+      setSaveStatus('error');
+      return;
+    }
+    
+    // Extract sections from career insight
+    const sections = insight.split('##');
+    const skills = sections.find(s => s.includes('Key Skills'))?.split('\n')
+      .filter(line => line.includes('•'))
+      .map(line => line.replace('•', '').trim()) || [];
+    const interests = sections.find(s => s.includes('Career Interests'))?.split('\n')
+      .filter(line => line.includes('•'))
+      .map(line => line.replace('•', '').trim()) || [];
+    const qualifications = sections.find(s => s.includes('Qualifications'))?.split('\n')
+      .filter(line => line.includes('•'))
+      .map(line => line.replace('•', '').trim()) || [];
+    
+    // Debug output
+    console.log('Extracted data to save:');
+    console.log('Skills:', skills);
+    console.log('Interests:', interests);
+    console.log('Qualifications:', qualifications);
+    
+    // Check if user details already exist
+    console.log('Checking if user_details record exists for user ID:', user.id);
+    const { data: existingData, error: fetchError } = await supabase
+      .from('user_details')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+      
+    if (fetchError) {
+      console.log('Fetch error code:', fetchError.code);
+      console.log('Fetch error message:', fetchError.message);
+      
+      if (fetchError.code !== 'PGRST116') { // Not found is ok
+        console.error('Error fetching user details:', fetchError);
+        
+        // If we get a foreign key violation, we need to handle it specially
+        if (fetchError.code === '23503') {
+          console.log('Foreign key constraint error - will save quiz results to local storage instead');
+          
+          // Save to local storage as a fallback
+          localStorage.setItem('careerQuizResults', JSON.stringify({
+            userId: user.id,
+            skills: skills,
+            interests: interests,
+            qualifications: qualifications,
+            timestamp: new Date().toISOString()
+          }));
+          
+          setSaveStatus('saved');
+          return; // Exit early
+        }
+      } else {
+        console.log('No existing record found - will create a new one');
+      }
+    } else {
+      console.log('Existing user_details found:', existingData);
+    }
+    
+    // Now actually save the data to the database
+    console.log('Preparing to save user details to database...');
+    let response;
+    
+    if (existingData) {
+      // Update existing record
+      console.log('Updating existing user_details record for user ID:', user.id);
+      response = await supabase
+        .from('user_details')
+        .update({
+          skills: skills,
+          interests: interests,
+          qualifications: qualifications,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+    } else {
+      // Insert new record
+      console.log('Creating new user_details record for user ID:', user.id);
+      response = await supabase
+        .from('user_details')
+        .insert({
+          id: user.id,
+          skills: skills,
+          interests: interests,
+          qualifications: qualifications
+        });
+    }
+    
+    console.log('Database operation response:', response);
+    
+    if (response.error) {
+      console.error('Error saving user details:', response.error);
+      console.log('Error code:', response.error.code);
+      console.log('Error message:', response.error.message);
+      setSaveStatus('error');
+      
+      // Save to local storage as a fallback
+      localStorage.setItem('careerQuizResults', JSON.stringify({
+        userId: user.id,
+        skills: skills,
+        interests: interests,
+        qualifications: qualifications,
+        timestamp: new Date().toISOString()
+      }));
+    } else {
+      console.log('Successfully saved user details to database');
+      setSaveStatus('saved');
+    }
+  } catch (err) {
+    console.error('Error in saveCareerGuidance:', err);
+    setSaveStatus('error');
+    
+    // Save to local storage as a fallback
+    try {
+      localStorage.setItem('careerQuizResults', JSON.stringify({
+        userId: user.id,
+        skills: skills || [],
+        interests: interests || [],
+        qualifications: qualifications || [],
+        timestamp: new Date().toISOString()
+      }));
+    } catch (localStorageError) {
+      console.error('Failed to save to localStorage:', localStorageError);
+    }
+  }
+};
   // Map top career fields to broader career paths
   const determineCareerPaths = (topFields) => {
     const pathScores = {
@@ -634,6 +833,15 @@ DO NOT include weights or other fields - just category, question and options.`
       {!quizStarted ? (
         <div className="text-center">
           <p className="mb-6">This quiz will help you discover potential career paths based on your preferences, skills, and personality. Answer thoughtfully to receive personalized career insights.</p>
+          {user ? (
+            <p className="text-sm text-blue-600 mb-4">
+              Your results will be saved to your profile
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500 mb-4">
+              Sign in to save your results to your profile
+            </p>
+          )}
           <button 
             onClick={handleStartQuiz} 
             className="bg-blue-500 text-white py-3 px-6 rounded-lg hover:bg-blue-600 disabled:opacity-50 text-lg"
@@ -646,16 +854,25 @@ DO NOT include weights or other fields - just category, question and options.`
         <div className="bg-white shadow-lg rounded-lg p-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-blue-700">Your Career Insights</h2>
-            <button 
-              onClick={() => window.print()}
-              className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded flex items-center"
-              title="Print or save as PDF"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
-              </svg>
-              Save/Print
-            </button>
+            <div className="flex items-center">
+              {user && (
+                <div className="text-sm mr-3">
+                  {saveStatus === 'saving' && <span className="text-yellow-600">Saving to profile...</span>}
+                  {saveStatus === 'saved' && <span className="text-green-600">Saved to profile ✓</span>}
+                  {saveStatus === 'error' && <span className="text-red-600">Error saving results</span>}
+                </div>
+              )}
+              <button 
+                onClick={() => window.print()}
+                className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded flex items-center"
+                title="Print or save as PDF"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
+                </svg>
+                Save/Print
+              </button>
+            </div>
           </div>
           
           <div className="border-b border-gray-200 mb-6 pb-2">
