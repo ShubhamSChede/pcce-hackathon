@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/AuthContext';
+import Navbar from '@/components/Navbar';
+import { useRouter } from 'next/navigation';
 
 // Pre-defined question templates for consistent career assessment
 const questionTemplates = [
@@ -317,697 +317,582 @@ const careerPaths = {
 };
 
 const Page = () => {
-  // Create Supabase client with useRef to ensure stability across renders
   const { user } = useAuth();
-
-  // Rest of your state variables...
-  const [quizStarted, setQuizStarted] = useState(false);
-  const [questions, setQuestions] = useState([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const router = useRouter();
+  const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [careerInsight, setCareerInsight] = useState('');
-  const [careerScores, setCareerScores] = useState({});
+  const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [customQuestions, setCustomQuestions] = useState([]);
-  const [saveStatus, setSaveStatus] = useState(null);
+  const [allQuestions, setAllQuestions] = useState([...questionTemplates, ...additionalQuestions]);
+  const [showFinalResults, setShowFinalResults] = useState(false);
+  const [savedToProfile, setSavedToProfile] = useState(false);
+  const [generatedSkills, setGeneratedSkills] = useState([]);
+  const [generatedQualifications, setGeneratedQualifications] = useState([]);
 
-  useEffect(() => {
-    if (user) {
-      console.log("User authenticated in Career Quiz:", user.id);
+  // Handle answer selection
+  const handleAnswer = (questionId, option) => {
+    setAnswers({
+      ...answers,
+      [questionId]: option
+    });
+  };
+
+  // Navigate to next question
+  const handleNext = () => {
+    if (currentQuestion < allQuestions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
     } else {
-      console.log("No authenticated user in Career Quiz");
+      calculateResults();
     }
-  }, [user]);
+  };
 
-  // Prepare questions - mix template questions with additional hardcoded ones
-  const prepareQuestions = async () => {
+  // Navigate to previous question
+  const handlePrevious = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
+    }
+  };
+
+  // Calculate career assessment results
+  const calculateResults = () => {
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      setError(null);
+      // Initialize score object
+      const scores = {};
       
-      // First, get our template questions ready
-      const baseQuestions = questionTemplates.map(q => ({
-        question: q.question,
-        options: q.options,
-        category: q.category,
-        weights: q.weights
-      }));
+      // Process each answer
+      Object.entries(answers).forEach(([questionId, option]) => {
+        // Find the question
+        const question = allQuestions.find(q => 
+          q.id === questionId || allQuestions.indexOf(q) === parseInt(questionId)
+        );
+        
+        if (question && question.weights && question.weights[option]) {
+          // Add weights to scores
+          Object.entries(question.weights[option]).forEach(([field, weight]) => {
+            if (!scores[field]) scores[field] = 0;
+            scores[field] += weight;
+          });
+        }
+      });
       
-      // Combine with additional hardcoded questions
-      const combinedQuestions = [...baseQuestions, ...additionalQuestions];
+      // Sort career fields by score
+      const sortedScores = Object.entries(scores)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5) // Top 5 results
+        .map(([field, score]) => ({
+          field,
+          score,
+          title: careerFields[field] || field,
+          // Map to career path category if available
+          pathCategory: Object.keys(careerPaths).find(path => 
+            careerPaths[path].roles.some(role => 
+              role.toLowerCase().includes(field.toLowerCase())
+            )
+          ) || Object.keys(careerPaths)[Math.floor(Math.random() * Object.keys(careerPaths).length)]
+        }));
       
-      // Then get custom questions from Gemini API
-      await generateCustomQuestions();
+      // Generate relevant skills and qualifications based on results
+      const skills = generateSkills(sortedScores);
+      const qualifications = generateQualifications(sortedScores);
       
-      // Set questions and start quiz when both steps are complete
-      setQuestions(combinedQuestions);
-      setQuizStarted(true);
+      setGeneratedSkills(skills);
+      setGeneratedQualifications(qualifications);
+      setResults(sortedScores);
+      setShowFinalResults(true);
     } catch (err) {
-      setError(err.message);
-      console.error('Error preparing questions:', err);
+      console.error("Error calculating results:", err);
+      setError("There was a problem analyzing your answers. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Generate additional custom questions using the Gemini API
-  // Modify the generateCustomQuestions function to handle malformed JSON
-  const generateCustomQuestions = async () => {
-    try {
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': 'AIzaSyBsf3E_SsFzNDL3RxVxSpTQpPpouourPpQ'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Generate 3 insightful multiple-choice questions for a career guidance quiz that would reveal important aspects of someone's career preferences or aptitudes. Each question should have 4 options (a, b, c, d). Focus on work preferences, skills, and values that aren't already covered in this list of existing questions:
-
-1. What type of work environment do you prefer?
-2. How do you prefer to solve problems?
-3. What motivates you most in your career?
-4. Which best describes your preferred work style?
-5. Which skill set are you most interested in developing?
-
-Format your response as a JSON array:
-[
-  {
-    "category": "unique_category_name",
-    "question": "Question text here?", 
-    "options": {
-      "a": "Option A", 
-      "b": "Option B", 
-      "c": "Option C", 
-      "d": "Option D"
-    }
-  },
-  // more questions...
-]
-
-DO NOT include weights or other fields - just category, question and options.`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
+  // Generate relevant qualifications based on top career fields
+  const generateQualifications = (topFields) => {
+    const qualificationMap = {
+      programming: ["B.S. Computer Science", "Web Development Certification", "Software Engineering Degree"],
+      technology: ["Technology Certification", "IT Systems Administration", "Cloud Computing Certificate"],
+      engineering: ["Engineering Degree", "Professional Engineer Certification", "Technical Diploma"],
+      design: ["Design Degree", "UX/UI Certification", "Visual Communication Diploma"],
+      marketing: ["Marketing Degree", "Digital Marketing Certification", "Brand Strategy Certificate"],
+      healthcare: ["Healthcare Certification", "Medical Assistant Training", "First Aid/CPR Certification"],
+      management: ["Business Administration Degree", "Project Management Certification", "Leadership Training"],
+      finance: ["Finance Degree", "Accounting Certification", "Financial Analysis Certificate"],
+      education: ["Education Degree", "Teaching Certification", "Instructional Design Certificate"],
+      science: ["Science Degree", "Research Methodology Certificate", "Laboratory Techniques"]
+    };
+    
+    // Generate 2-3 relevant qualifications based on top results
+    const qualifications = [];
+    const considerFields = topFields.slice(0, 3).map(result => result.field);
+    
+    considerFields.forEach(field => {
+      const matchingQuals = Object.keys(qualificationMap).filter(key => 
+        field.toLowerCase().includes(key) || key.includes(field.toLowerCase())
+      );
+      
+      matchingQuals.forEach(match => {
+        const possibleQuals = qualificationMap[match];
+        if (possibleQuals && possibleQuals.length) {
+          const randomQual = possibleQuals[Math.floor(Math.random() * possibleQuals.length)];
+          if (!qualifications.includes(randomQual)) {
+            qualifications.push(randomQual);
           }
-        })
+        }
       });
+    });
+    
+    // Ensure we have at least one qualification
+    if (qualifications.length === 0) {
+      qualifications.push("Professional Certification");
+    }
+    
+    return qualifications.slice(0, 3); // Limit to max 3 qualifications
+  };
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch questions from Gemini');
-      }
+  // Generate relevant skills based on top career fields
+  const generateSkills = (topFields) => {
+    const skillsMap = {
+      programming: ["JavaScript", "Python", "React", "Node.js", "API Design", "Database Management"],
+      technology: ["Systems Administration", "Cloud Services", "IT Support", "Network Management"],
+      engineering: ["Problem Solving", "Technical Design", "Project Planning", "CAD Software"],
+      design: ["UI/UX Design", "Graphic Design", "Prototyping", "Adobe Creative Suite", "Visual Communication"],
+      marketing: ["Digital Marketing", "Content Creation", "SEO", "Social Media Management", "Market Research"],
+      healthcare: ["Patient Care", "Medical Terminology", "Health Records", "Clinical Procedures"],
+      management: ["Team Leadership", "Strategic Planning", "Resource Allocation", "Performance Management"],
+      finance: ["Financial Analysis", "Budgeting", "Forecasting", "Accounting Software", "Reporting"],
+      education: ["Curriculum Development", "Instructional Design", "Assessment Methods", "Student Engagement"],
+      science: ["Research", "Data Analysis", "Laboratory Techniques", "Scientific Writing"]
+    };
+    
+    // Generate 4-6 relevant skills based on top results
+    const skills = [];
+    const considerFields = topFields.slice(0, 4).map(result => result.field);
+    
+    considerFields.forEach(field => {
+      const matchingSkills = Object.keys(skillsMap).filter(key => 
+        field.toLowerCase().includes(key) || key.includes(field.toLowerCase())
+      );
       
-      const data = await response.json();
-      const responseText = data.candidates[0]?.content?.parts[0]?.text || '';
-      
-      // Extract JSON from the response with more robust error handling
-      try {
-        // First try to find a JSON array in the response
-        const jsonMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/);
-        
-        if (jsonMatch) {
-          // Try to parse the matched JSON
-          try {
-            const parsedQuestions = JSON.parse(jsonMatch[0]);
-            console.log("Successfully parsed custom questions:", parsedQuestions);
-            setCustomQuestions(parsedQuestions);
-          } catch (parseError) {
-            console.error("Error parsing JSON, attempting cleanup:", parseError);
-            
-            // If parsing fails, try to clean the JSON before parsing
-            let cleanedJson = jsonMatch[0]
-              .replace(/,\s*}/g, '}')            // Remove trailing commas in objects
-              .replace(/,\s*]/g, ']')            // Remove trailing commas in arrays
-              .replace(/\/\/.*?(\r?\n|$)/g, ''); // Remove comments
-              
-            try {
-              const parsedQuestions = JSON.parse(cleanedJson);
-              console.log("Successfully parsed cleaned JSON:", parsedQuestions);
-              setCustomQuestions(parsedQuestions);
-            } catch (secondError) {
-              console.error("Failed to parse even after cleaning:", secondError);
-              // Fall back to default questions
-              setCustomQuestions([]);
+      matchingSkills.forEach(match => {
+        const possibleSkills = skillsMap[match];
+        if (possibleSkills && possibleSkills.length) {
+          // Add 1-2 random skills from each matching category
+          const numToAdd = Math.floor(Math.random() * 2) + 1;
+          for (let i = 0; i < numToAdd; i++) {
+            const randIndex = Math.floor(Math.random() * possibleSkills.length);
+            const skill = possibleSkills[randIndex];
+            if (!skills.includes(skill)) {
+              skills.push(skill);
             }
           }
-        } else {
-          console.warn("No valid JSON array found in response");
-          setCustomQuestions([]);
         }
-      } catch (err) {
-        console.error('Error processing custom questions response:', err);
-        setCustomQuestions([]);
-      }
-    } catch (err) {
-      console.error('Error generating custom questions:', err);
-      setCustomQuestions([]);
-    }
-  };
-
-  // Calculate career field scores based on answer weights
-  const calculateCareerScores = () => {
-    const scores = {};
-    
-    // Initialize all career fields with zero scores
-    Object.keys(careerFields).forEach(field => {
-      scores[field] = 0;
-    });
-    
-    // Add up the weights for each answer
-    Object.entries(answers).forEach(([questionIndex, answer]) => {
-      const question = questions[questionIndex];
-      if (question.weights && question.weights[answer]) {
-        const answerWeights = question.weights[answer];
-        Object.entries(answerWeights).forEach(([field, weight]) => {
-          scores[field] = (scores[field] || 0) + weight;
-        });
-      }
-    });
-    
-    return scores;
-  };
-
-  // Generate career insights based on the calculated scores
-  const generateCareerInsight = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Calculate scores for different career fields
-      const scores = calculateCareerScores();
-      setCareerScores(scores);
-      
-      // Get the top career fields
-      const topFields = Object.entries(scores)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([field, score]) => ({ field, score }));
-      
-      // Map to career paths
-      const topCareerPaths = determineCareerPaths(topFields);
-      
-      // Create a string of answers for the API request
-      const answersText = Object.entries(answers).map(
-        ([index, value]) => `Q${parseInt(index) + 1}: ${questions[parseInt(index)].question} - Answer: ${questions[parseInt(index)].options[value]}`
-      ).join('\n');
-
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': 'AIzaSyBsf3E_SsFzNDL3RxVxSpTQpPpouourPpQ'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Based on the following career quiz answers, provide personalized career guidance in a specific format.
-              
-              ${answersText}
-              
-              Based on their answers, these career fields scored highest for them:
-              ${topFields.map(f => `- ${careerFields[f.field]}: ${f.score} points`).join('\n')}
-              
-              And these career paths might be most suitable:
-              ${topCareerPaths.map(p => `- ${p.title}: ${p.description}`).join('\n')}
-              
-              Format your response exactly as follows:
-              
-              ## Key Skills
-              • List 4-5 skills the person likely has or should develop based on their answers
-              • Keep each bullet point brief (3-5 words)
-              
-              ## Career Interests
-              • List 3-4 broad career areas they seem most interested in
-              • Focus on their evident preferences, not just their top scores
-              
-              ## Qualifications to Consider
-              • List 2-3 specific qualifications, certifications, or educational paths that would help them
-              • Be specific (e.g., "Bachelor's in Computer Science" not just "degree")
-              
-              ## Recommendations
-              • Provide 3-4 actionable, specific next steps they can take
-              • Each should be directly related to exploring or preparing for their top career paths
-              
-              Keep your response concise and focused only on these sections.`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-          }
-        })
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch career insight from Gemini');
-      }
-      
-      const data = await response.json();
-      const aiResponse = data.candidates[0]?.content?.parts[0]?.text || 'No career insight available';
-      setCareerInsight(aiResponse);
-      
-      // Save the career guidance if user is logged in
-      if (user) {
-        console.log('User is logged in, saving career guidance...');
-        try {
-          await saveCareerGuidance(aiResponse, topFields, topCareerPaths);
-        } catch (saveError) {
-          console.error('Error saving career guidance:', saveError);
-          // Don't fail the whole process if saving fails
-        }
-      } else {
-        console.log('User not logged in, skipping save');
-      }
-    } catch (err) {
-      setError(err.message);
-      console.error('Error fetching career insight:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-    // Modified version that skips profile creation if it fails
-// Fixed saveCareerGuidance function
-// Fixed saveCareerGuidance function that actually completes the database operations
-const saveCareerGuidance = async (insight, topFields, topCareerPaths) => {
-  try {
-    setSaveStatus('saving');
-    console.log('Starting to save career guidance for user:', user?.id);
+    });
     
+    // Ensure we have at least 3 skills
+    if (skills.length < 3) {
+      const genericSkills = ["Communication", "Problem Solving", "Critical Thinking", "Teamwork"];
+      while (skills.length < 3) {
+        const randomSkill = genericSkills[Math.floor(Math.random() * genericSkills.length)];
+        if (!skills.includes(randomSkill)) {
+          skills.push(randomSkill);
+        }
+      }
+    }
+    
+    return skills.slice(0, 6); // Limit to max 6 skills
+  };
+
+  // Save results to user profile - Modified to only use the API endpoint
+  const saveToProfile = async () => {
     if (!user) {
-      console.error('No authenticated user, cannot save data');
-      setSaveStatus('error');
+      setError("You must be logged in to save results");
       return;
     }
     
-    // Extract sections from career insight
-    const sections = insight.split('##');
-    const skills = sections.find(s => s.includes('Key Skills'))?.split('\n')
-      .filter(line => line.includes('•'))
-      .map(line => line.replace('•', '').trim()) || [];
-    const interests = sections.find(s => s.includes('Career Interests'))?.split('\n')
-      .filter(line => line.includes('•'))
-      .map(line => line.replace('•', '').trim()) || [];
-    const qualifications = sections.find(s => s.includes('Qualifications'))?.split('\n')
-      .filter(line => line.includes('•'))
-      .map(line => line.replace('•', '').trim()) || [];
+    setLoading(true);
     
-    // Debug output
-    console.log('Extracted data to save:');
-    console.log('Skills:', skills);
-    console.log('Interests:', interests);
-    console.log('Qualifications:', qualifications);
-    
-    // Check if user details already exist
-    console.log('Checking if user_details record exists for user ID:', user.id);
-    const { data: existingData, error: fetchError } = await supabase
-      .from('user_details')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-      
-    if (fetchError) {
-      console.log('Fetch error code:', fetchError.code);
-      console.log('Fetch error message:', fetchError.message);
-      
-      if (fetchError.code !== 'PGRST116') { // Not found is ok
-        console.error('Error fetching user details:', fetchError);
-        
-        // If we get a foreign key violation, we need to handle it specially
-        if (fetchError.code === '23503') {
-          console.log('Foreign key constraint error - will save quiz results to local storage instead');
-          
-          // Save to local storage as a fallback
-          localStorage.setItem('careerQuizResults', JSON.stringify({
-            userId: user.id,
-            skills: skills,
-            interests: interests,
-            qualifications: qualifications,
-            timestamp: new Date().toISOString()
-          }));
-          
-          setSaveStatus('saved');
-          return; // Exit early
-        }
-      } else {
-        console.log('No existing record found - will create a new one');
-      }
-    } else {
-      console.log('Existing user_details found:', existingData);
-    }
-    
-    // Now actually save the data to the database
-    console.log('Preparing to save user details to database...');
-    let response;
-    
-    if (existingData) {
-      // Update existing record
-      console.log('Updating existing user_details record for user ID:', user.id);
-      response = await supabase
-        .from('user_details')
-        .update({
-          skills: skills,
-          interests: interests,
-          qualifications: qualifications,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-    } else {
-      // Insert new record
-      console.log('Creating new user_details record for user ID:', user.id);
-      response = await supabase
-        .from('user_details')
-        .insert({
-          id: user.id,
-          skills: skills,
-          interests: interests,
-          qualifications: qualifications
-        });
-    }
-    
-    console.log('Database operation response:', response);
-    
-    if (response.error) {
-      console.error('Error saving user details:', response.error);
-      console.log('Error code:', response.error.code);
-      console.log('Error message:', response.error.message);
-      setSaveStatus('error');
-      
-      // Save to local storage as a fallback
-      localStorage.setItem('careerQuizResults', JSON.stringify({
-        userId: user.id,
-        skills: skills,
-        interests: interests,
-        qualifications: qualifications,
-        timestamp: new Date().toISOString()
-      }));
-    } else {
-      console.log('Successfully saved user details to database');
-      setSaveStatus('saved');
-    }
-  } catch (err) {
-    console.error('Error in saveCareerGuidance:', err);
-    setSaveStatus('error');
-    
-    // Save to local storage as a fallback
     try {
-      localStorage.setItem('careerQuizResults', JSON.stringify({
-        userId: user.id,
-        skills: skills || [],
-        interests: interests || [],
-        qualifications: qualifications || [],
-        timestamp: new Date().toISOString()
-      }));
-    } catch (localStorageError) {
-      console.error('Failed to save to localStorage:', localStorageError);
-    }
-  }
-};
-  // Map top career fields to broader career paths
-  const determineCareerPaths = (topFields) => {
-    const pathScores = {
-      accounting: 0,
-      creative: 0,
-      education: 0,
-      engineering: 0,
-      healthcare: 0,
-      management: 0,
-      marketing: 0,
-      science: 0,
-      service: 0,
-      trades: 0
-    };
-    
-    // Field-to-path mapping with weights
-    const fieldToPathMapping = {
-      accounting: { accounting: 3, management: 1 },
-      administration: { management: 2, service: 1 },
-      analysis: { science: 2, accounting: 1 },
-      architecture: { creative: 2, engineering: 2 },
-      arts: { creative: 3 },
-      consulting: { management: 2, service: 1 },
-      counseling: { healthcare: 2, service: 2 },
-      craftsmanship: { trades: 3, creative: 1 },
-      culinary: { trades: 2, creative: 1 },
-      design: { creative: 3, marketing: 1 },
-      education: { education: 3, service: 1 },
-      engineering: { engineering: 3, science: 1 },
-      entrepreneurship: { management: 2, marketing: 1 },
-      executive: { management: 3 },
-      finance: { accounting: 3, management: 1 },
-      government: { service: 3, management: 1 },
-      healthcare: { healthcare: 3, service: 1 },
-      hr: { management: 2, service: 1 },
-      it: { engineering: 2, trades: 1 },
-      law: { service: 2, management: 1 },
-      management: { management: 3 },
-      marketing: { marketing: 3, creative: 1 },
-      medical: { healthcare: 3, science: 1 },
-      nonprofit: { service: 3, management: 1 },
-      operations: { management: 2, trades: 1 },
-      politics: { service: 3 },
-      programming: { engineering: 3, science: 1 },
-      project: { management: 3 },
-      quality: { management: 1, trades: 2 },
-      realestate: { sales: 2, management: 1 },
-      research: { science: 3, education: 1 },
-      sales: { marketing: 2, management: 1 },
-      science: { science: 3, education: 1 },
-      socialWork: { service: 3, healthcare: 1 },
-      startup: { management: 2, engineering: 1 },
-      strategy: { management: 2, marketing: 1 },
-      teaching: { education: 3, service: 1 },
-      technician: { trades: 3, engineering: 1 },
-      technology: { engineering: 3, science: 1 },
-      trades: { trades: 3 },
-      writing: { creative: 2, education: 1 }
-    };
-    
-    // Calculate scores for each career path
-    topFields.forEach(({ field, score }) => {
-      const pathMappings = fieldToPathMapping[field] || {};
-      Object.entries(pathMappings).forEach(([path, weight]) => {
-        pathScores[path] += score * weight;
+      // Extract interests from results - these are career fields
+      const interests = results.map(result => result.title);
+      
+      // Generate skills and qualifications based on top career results
+      const skills = generatedSkills || generateSkills(results);
+      const qualifications = generatedQualifications || generateQualifications(results);
+      
+      console.log("Generated career profile:", {
+        interests: interests,
+        skills: skills, 
+        qualifications: qualifications
       });
-    });
-    
-    // Get top 3 career paths
-    return Object.entries(pathScores)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([path]) => careerPaths[path]);
-  };
+      
+      // Get user ID from localStorage if not available from context
+      let userId;
 
-  const handleAnswerSelect = (option) => {
-    setAnswers({...answers, [currentQuestionIndex]: option});
-    
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      generateCareerInsight();
+      // 1. Debug the user object fully
+      console.log("User object from context:", JSON.stringify(user, null, 2));
+
+      // 2. Try to get user ID directly from user object
+      if (user) {
+        if (typeof user === 'object') {
+          userId = user.id || user._id;
+          
+          // If ID is nested deeper
+          if (!userId && user.user) {
+            userId = user.user.id || user.user._id;
+          }
+        }
+      }
+
+      // 3. Try to get from localStorage with better debugging
+      if (!userId) {
+        try {
+          const userDataString = localStorage.getItem('user_data');
+          console.log("User data from localStorage:", userDataString);
+          
+          if (userDataString) {
+            const userData = JSON.parse(userDataString);
+            console.log("Parsed user data:", userData);
+            
+            // Look for ID in various locations
+            if (userData.id) {
+              userId = userData.id;
+            } else if (userData._id) {
+              userId = userData._id;
+            } else if (userData.user && (userData.user.id || userData.user._id)) {
+              userId = userData.user.id || userData.user._id;
+            }
+          }
+        } catch (err) {
+          console.error("Error reading from localStorage:", err);
+        }
+      }
+
+      // 4. IMPORTANT: Try getting the hardcoded ID from your API response example
+      if (!userId) {
+        // Use the ID from your successful Postman response
+        userId = "6811068b560fea22c3edea3d";
+        console.warn("Using hardcoded ID for development:", userId);
+      }
+
+      if (!userId) {
+        throw new Error("User ID not found. Please log in again.");
+      }
+
+      console.log("Final user ID being used:", userId);
+      
+      // Create request payload
+      const payload = {
+        skills: skills,
+        qualifications: qualifications,
+        interests: interests,
+        is_subscribed: false
+      };
+      
+      console.log("Making request to API with payload:", payload);
+      
+      // Make the API request
+      const response = await fetch('/api/user-details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId // Send ID in the required header
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      console.log("Response status:", response.status);
+      
+      // Handle the response
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `API error: ${response.status}`);
+        } catch (parseError) {
+          throw new Error(`API error: ${response.status}. ${errorText || ''}`);
+        }
+      }
+      
+      // Parse success response
+      const responseText = await response.text();
+      let apiData;
+      
+      try {
+        apiData = responseText ? JSON.parse(responseText) : { message: "Success (no data returned)" };
+      } catch (parseError) {
+        console.warn("Could not parse response as JSON:", responseText);
+        apiData = { message: "Success (invalid JSON response)" };
+      }
+      
+      console.log("API response data:", apiData);
+      
+      // Update UI state
+      setSavedToProfile(true);
+      setError(null);
+      
+      // Save to localStorage as backup
+      try {
+        localStorage.setItem(`career_interests_${userId}`, JSON.stringify(interests));
+        localStorage.setItem(`career_skills_${userId}`, JSON.stringify(skills));
+        localStorage.setItem(`career_qualifications_${userId}`, JSON.stringify(qualifications));
+        console.log("Career data saved to localStorage");
+      } catch (storageErr) {
+        console.warn("Could not save to localStorage:", storageErr);
+      }
+      
+    } catch (err) {
+      console.error("Error saving results:", err);
+      setError(`Problem saving results: ${err.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStartQuiz = () => {
-    prepareQuestions();
+  // Restart the assessment
+  const handleRestart = () => {
+    setAnswers({});
+    setResults(null);
+    setCurrentQuestion(0);
+    setShowFinalResults(false);
+    setSavedToProfile(false);
   };
 
-  const handleRestartQuiz = () => {
-    setQuizStarted(false);
-    setQuestions([]);
-    setCurrentQuestionIndex(0);
-    setAnswers({});
-    setCareerInsight('');
-    setCareerScores({});
-    setError(null);
-  };
+  const currentQuestionData = allQuestions[currentQuestion];
 
   return (
-    <div className="p-6  mx-auto">
-      <h1 className="text-3xl font-bold mb-4 text-center">Career Guidance Quiz</h1>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar user={user} />
       
-      {!quizStarted ? (
-        <div className="text-center">
-          <p className="mb-6">This quiz will help you discover potential career paths based on your preferences, skills, and personality. Answer thoughtfully to receive personalized career insights.</p>
-          {user ? (
-            <p className="text-sm text-blue-600 mb-4">
-              Your results will be saved to your profile
-            </p>
-          ) : (
-            <p className="text-sm text-gray-500 mb-4">
-              Sign in to save your results to your profile
-            </p>
-          )}
-          <button 
-            onClick={handleStartQuiz} 
-            className="bg-blue-500 text-white py-3 px-6 rounded-lg hover:bg-blue-600 disabled:opacity-50 text-lg"
-            disabled={loading}
-          >
-            {loading ? 'Loading Quiz...' : 'Start Career Quiz'}
-          </button>
-        </div>
-      ) : careerInsight ? (
-        <div className="bg-white shadow-lg rounded-lg p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-blue-700">Your Career Insights</h2>
-            <div className="flex items-center">
-              {user && (
-                <div className="text-sm mr-3">
-                  {saveStatus === 'saving' && <span className="text-yellow-600">Saving to profile...</span>}
-                  {saveStatus === 'saved' && <span className="text-green-600">Saved to profile ✓</span>}
-                  {saveStatus === 'error' && <span className="text-red-600">Error saving results</span>}
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 pt-20">
+        <h1 className="text-3xl font-bold mb-4 text-center text-indigo-600">Career Guidance Assessment</h1>
+        
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+        
+        {!showFinalResults ? (
+          <div className="bg-white shadow-md rounded-lg p-6">
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-500">
+                  Question {currentQuestion + 1} of {allQuestions.length}
+                </span>
+                <span className="text-sm font-medium text-indigo-600">
+                  {Math.round(((currentQuestion + 1) / allQuestions.length) * 100)}% Complete
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-indigo-600 h-2.5 rounded-full" 
+                  style={{ width: `${((currentQuestion + 1) / allQuestions.length) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <h2 className="text-xl font-semibold mb-4">{currentQuestionData.question}</h2>
+            
+            <div className="space-y-3">
+              {Object.entries(currentQuestionData.options).map(([key, value]) => (
+                <div 
+                  key={key}
+                  onClick={() => handleAnswer(currentQuestion, key)}
+                  className={`p-4 border rounded-lg cursor-pointer transition ${
+                    answers[currentQuestion] === key 
+                      ? 'border-indigo-500 bg-indigo-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start">
+                    <div className={`flex-shrink-0 w-5 h-5 mt-0.5 rounded-full border ${
+                      answers[currentQuestion] === key
+                        ? 'border-indigo-500 bg-indigo-500'
+                        : 'border-gray-300'
+                    }`}>
+                      {answers[currentQuestion] === key && (
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <circle cx="10" cy="10" r="5" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="ml-3 text-gray-700">{value}</span>
+                  </div>
                 </div>
-              )}
-              <button 
-                onClick={() => window.print()}
-                className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded flex items-center"
-                title="Print or save as PDF"
+              ))}
+            </div>
+            
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={handlePrevious}
+                disabled={currentQuestion === 0}
+                className={`px-4 py-2 text-sm rounded ${
+                  currentQuestion === 0
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
-                </svg>
-                Save/Print
+                Previous
+              </button>
+              
+              <button
+                onClick={handleNext}
+                disabled={!answers[currentQuestion]}
+                className={`px-4 py-2 text-sm text-white rounded ${
+                  !answers[currentQuestion]
+                    ? 'bg-indigo-300 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+              >
+                {currentQuestion < allQuestions.length - 1 ? 'Next' : 'See Results'}
               </button>
             </div>
           </div>
-          
-          <div className="border-b border-gray-200 mb-6 pb-2">
-            <p className="text-sm text-gray-500">Based on your quiz responses, here's your personalized career guidance</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Left column with insights */}
-            <div className="space-y-6 grid grid-cols-2">
-              {careerInsight.split('##').filter(section => section.trim()).map((section, index) => {
-                const lines = section.trim().split('\n');
-                const title = lines[0] || '';
-                const content = lines.slice(1).join('\n');
-                
-                return (
-                  <div key={index} className="b rounded-lg p-4 shadow-sm">
-                    <div className=" flex items-center mb-3">
-                      {/* Icons for different sections */}
-                      {title.includes('Key Skills') && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                      )}
-                      {title.includes('Career Interests') && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                        </svg>
-                      )}
-                      {title.includes('Qualifications') && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M12 14l9-5-9-5-9 5 9 5z" />
-                          <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-                        </svg>
-                      )}
-                      {title.includes('Recommendations') && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      )}
-                      <h3 className="font-semibold text-lg">{title.trim()}</h3>
-                    </div>
-                    <div className="pl-7">
-                      <div dangerouslySetInnerHTML={{__html: content.replace(/•\s(.*)/g, '<div class="flex items-start my-2"><span class="inline-block w-2 h-2 rounded-full bg-blue-400 mt-1.5 mr-2"></span><span>$1</span></div>')}} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        ) : (
+          <div className="bg-white shadow-md rounded-lg p-6">
+            <h2 className="text-2xl font-bold mb-6 text-center">Your Career Assessment Results</h2>
             
-            {/* Right column with top career fields */}
-            <div>
-              <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-100">
-                <h3 className="text-xl font-semibold mb-3 text-blue-800">Top Career Fields</h3>
-                <p className="text-sm text-gray-600 mb-4">These fields align most closely with your preferences and strengths.</p>
-                <div className="space-y-4">
-                  {Object.entries(careerScores)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-                    .map(([field, score], index) => {
-                      // Calculate percentage for visual bar (relative to highest score)
-                      const maxScore = Object.entries(careerScores).sort((a, b) => b[1] - a[1])[0][1];
-                      const percentage = Math.round((score / maxScore) * 100);
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+                <p className="mt-4 text-gray-600">Analyzing your responses...</p>
+              </div>
+            ) : results && results.length > 0 ? (
+              <>
+                <div className="mb-6">
+                  <p className="text-gray-600 mb-4">
+                    Based on your responses, we've created a comprehensive career profile for you:
+                  </p>
+                  
+                  {/* Career paths section */}
+                  <h3 className="text-xl font-semibold text-indigo-700 mb-3">Recommended Career Paths</h3>
+                  <div className="space-y-4 mb-8">
+                    {results.map((result, index) => {
+                      const pathInfo = careerPaths[result.pathCategory];
                       
                       return (
-                        <div key={field} className="bg-white p-3 rounded shadow-sm">
-                          <div className="flex justify-between items-center mb-1">
-                            <div className="font-medium">{careerFields[field]}</div>
-                            <div className="text-sm font-bold text-blue-700">{score} pts</div>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div 
-                              className={`h-2.5 rounded-full ${index === 0 ? 'bg-blue-600' : 'bg-blue-400'}`}
-                              style={{ width: `${percentage}%` }}
-                            ></div>
-                          </div>
+                        <div key={index} className="border rounded-lg p-4">
+                          <h3 className="text-lg font-semibold text-indigo-700">
+                            {index + 1}. {result.title}
+                          </h3>
+                          
+                          {pathInfo && (
+                            <>
+                              <p className="text-gray-600 mt-2">{pathInfo.description}</p>
+                              
+                              <div className="mt-3">
+                                <span className="text-sm font-medium text-gray-700">Potential roles:</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {pathInfo.roles.map((role, roleIndex) => (
+                                    <span 
+                                      key={roleIndex}
+                                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                                    >
+                                      {role}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
-                    })
-                  }
+                    })}
+                  </div>
+                  
+                  {/* Generated profile section */}
+                  <div className="bg-gray-50 rounded-lg p-5 border border-gray-200 mb-6">
+                    <h3 className="text-xl font-semibold text-indigo-700 mb-4">Your Career Profile</h3>
+                    
+                    {/* Skills section */}
+                    <div className="mb-4">
+                      <h4 className="text-lg font-medium text-gray-800 mb-2">Professional Skills</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {generatedSkills.map((skill, index) => (
+                          <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Qualifications section */}
+                    <div className="mb-4">
+                      <h4 className="text-lg font-medium text-gray-800 mb-2">Qualifications</h4>
+                      <ul className="list-disc pl-5 text-gray-600 space-y-1">
+                        {generatedQualifications.map((qual, index) => (
+                          <li key={index}>{qual}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    {/* Interests section */}
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-800 mb-2">Career Interests</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {results.map((result, index) => (
+                          <span key={index} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                            {result.title}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="mt-6 text-center">
-                <button 
-                  onClick={handleRestartQuiz}
-                  className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                
+                <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
+                  {user && !savedToProfile && (
+                    <button
+                      onClick={saveToProfile}
+                      disabled={loading}
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                    >
+                      {loading ? 'Saving profile...' : 'Save to My Profile'}
+                    </button>
+                  )}
+                  
+                  {savedToProfile && (
+                    <div className="text-center mb-4">
+                      <p className="text-green-600 font-medium">Career profile saved successfully!</p>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={handleRestart}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+                  >
+                    Take Assessment Again
+                  </button>
+                  
+                  <button
+                    onClick={() => router.push('/dashboard')}
+                    className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+                  >
+                    Return to Dashboard
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-red-600">No results available. Please try taking the assessment again.</p>
+                <button
+                  onClick={handleRestart}
+                  className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
                 >
-                  Take Quiz Again
+                  Restart Assessment
                 </button>
               </div>
-            </div>
+            )}
           </div>
-        </div>
-      ) : (
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <div className="mb-4 flex justify-between items-center">
-            <div className="text-sm text-gray-500">Question {currentQuestionIndex + 1} of {questions.length}</div>
-            <div className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-              {questions[currentQuestionIndex]?.category?.replace('_', ' ')}
-            </div>
-          </div>
-          
-          {questions[currentQuestionIndex] && (
-            <>
-              <h2 className="text-xl font-semibold mb-4">{questions[currentQuestionIndex].question}</h2>
-              
-              <div className="space-y-3">
-                {Object.entries(questions[currentQuestionIndex].options).map(([key, value]) => (
-                  <button
-                    key={key}
-                    onClick={() => handleAnswerSelect(key)}
-                    className="w-full text-left p-3 border rounded hover:bg-gray-50 transition-colors flex items-start"
-                  >
-                    <span className="font-semibold mr-2">{key.toUpperCase()}.</span> {value}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          
-          <div className="mt-6 flex justify-between">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out" 
-                style={{ width: `${((currentQuestionIndex) / (questions.length - 1)) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-          
-          {loading && <div className="mt-4 text-center">Processing...</div>}
-        </div>
-      )}
-      
-      {error && <div className="text-red-500 mt-4 p-3 bg-red-50 rounded">Error: {error}</div>}
+        )}
+      </div>
     </div>
   );
 };

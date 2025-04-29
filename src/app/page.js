@@ -266,7 +266,7 @@ export default function Home() {
 
   const handleLoginClick = () => {
     // Navigate to jobs page
-    router.push("/register");
+    router.push("/login");
   };
 
   // Remove button hover effects function

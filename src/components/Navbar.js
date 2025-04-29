@@ -37,7 +37,7 @@ export default function Navbar({ user }) {
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link 
                 href="/dashboard" 
-                className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
               >
                 Dashboard
               </Link>
@@ -52,6 +52,18 @@ export default function Navbar({ user }) {
                 className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
               >
                 Career Assessment
+              </Link>
+              <Link 
+                href="/roadmap" 
+                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+              >
+                Roadmap
+              </Link>
+              <Link 
+                href="/roadmapro" 
+                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+              >
+                Roadmap Pro
               </Link>
             </div>
           </div>
@@ -112,7 +124,7 @@ export default function Navbar({ user }) {
         <div className="pt-2 pb-3 space-y-1">
           <Link
             href="/dashboard"
-            className="bg-indigo-50 border-indigo-500 text-indigo-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            className="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
             onClick={() => setIsOpen(false)}
           >
             Dashboard
@@ -130,6 +142,20 @@ export default function Navbar({ user }) {
             onClick={() => setIsOpen(false)}
           >
             Career Assessment
+          </Link>
+          <Link
+            href="/roadmap"
+            className="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            onClick={() => setIsOpen(false)}
+          >
+            Roadmap
+          </Link>
+          <Link
+            href="/roadmapro"
+            className="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            onClick={() => setIsOpen(false)}
+          >
+            Roadmap Pro
           </Link>
         </div>
         <div className="pt-4 pb-3 border-t border-gray-200">

@@ -1,7 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/AuthContext';
+import Navbar from '@/components/Navbar';
 
 export default function SuperMarioLearningGame() {
+  const { user } = useAuth(); // Add this line to get user for Navbar
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [roadmapData, setRoadmapData] = useState(null);
@@ -240,7 +243,10 @@ export default function SuperMarioLearningGame() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-200 to-sky-400 p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-sky-200 to-sky-400 relative overflow-hidden">
+      {/* Add Navbar component */}
+      <Navbar user={user} />
+      
       {/* Sky background with clouds */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-20 left-10 w-16 h-8 bg-white rounded-full opacity-80 animate-pulse"></div>
@@ -249,7 +255,7 @@ export default function SuperMarioLearningGame() {
         <div className="absolute top-14 right-1/4 w-14 h-7 bg-white rounded-full opacity-80"></div>
       </div>
       
-      <div className="container mx-auto max-w-7xl relative z-10">
+      <div className="container mx-auto max-w-7xl relative z-10 pt-20 px-4"> {/* Added pt-20 for Navbar spacing */}
         <div className="flex justify-between items-center">
           <h1 className="text-4xl font-bold mb-6 text-center text-yellow-500 font-['Courier_New'] shadow-md">Super Mario Learning Adventure</h1>
           
@@ -268,9 +274,6 @@ export default function SuperMarioLearningGame() {
         
         {showIntro && !gameStarted && (
           <div className="bg-white rounded-xl shadow-xl p-8 mb-8 transition-all border-4 border-red-500">
-            <div className="flex justify-center mb-6">
-              <img src="/mario.png" alt="Mario" className="w-32 h-32" onError={(e) => {e.target.onerror = null; e.target.src="/api/placeholder/120/120"}} />
-            </div>
             <h2 className="text-2xl font-bold mb-4 text-center text-red-600">Welcome to Super Mario Learning Adventure!</h2>
             <p className="text-lg mb-6 text-center">Join Mario on a learning journey! Complete levels, collect coins, and become a master!</p>
             
@@ -463,6 +466,7 @@ export default function SuperMarioLearningGame() {
                     <p className="text-lg mb-2">You've completed the entire Super Mario Learning Adventure!</p>
                     <p className="font-bold text-yellow-600">Total Coins Earned: {coinCount}</p>
                     <p className="mt-4">Princess Peach (and your knowledge) has been saved!</p>
+                    {/* Replace image with SVG */}
                     <div className="flex justify-center mt-4">
                       <div className="w-24 h-24 relative">
                         <svg viewBox="0 0 32 32" className="w-full h-full">
@@ -477,8 +481,29 @@ export default function SuperMarioLearningGame() {
                     </div>
                   </div>
                 )}
-                
-                {/* Video preview */}
+
+                {/* Update quiz submission success message */}
+                {quizSubmitted && isLevelCompleted(currentLevel) && (
+                  <div className="p-6 bg-green-100 rounded-lg border-2 border-green-300 text-center">
+                    <p className="text-green-700 font-bold text-2xl mb-2">🎉 Boss Defeated! 🎉</p>
+                    <p className="text-green-700 font-bold text-xl mb-4">You earned 50 coins!</p>
+                    {currentLevel < roadmapData.topics.length - 1 && (
+                      <p className="text-green-600 mb-4">Advancing to next world...</p>
+                    )}
+                    {currentLevel === roadmapData.topics.length - 1 && (
+                      <p className="text-green-600 mb-4">Congratulations! You've completed the entire adventure!</p>
+                    )}
+                    <div className="flex justify-center mt-4">
+                      {/* Replace image with SVG */}
+                      <svg className="w-16 h-16 animate-bounce" viewBox="0 0 64 64">
+                        <circle cx="32" cy="32" r="30" fill="#FFD700" stroke="#B8860B" strokeWidth="2"/>
+                        <circle cx="32" cy="32" r="20" fill="#B8860B"/>
+                      </svg>
+                    </div>
+                  </div>
+                )}
+
+                {/* Continue with the rest of your component */}
                 {selectedVideo && (
                   <div className="bg-white rounded-xl shadow-xl p-6 border-4 border-yellow-400 mt-4">
                     <div className="flex justify-between items-center mb-4">
@@ -649,12 +674,11 @@ export default function SuperMarioLearningGame() {
                               <p className="text-green-600 mb-4">Congratulations! You've completed the entire adventure!</p>
                             )}
                             <div className="flex justify-center mt-4">
-                              <img src="/coin.png" alt="Coin" className="w-16 h-16 animate-bounce" 
-                                onError={(e) => {
-                                  e.target.onerror = null; 
-                                  e.target.src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><circle cx='32' cy='32' r='30' fill='%23FFD700' stroke='%23B8860B' stroke-width='2'/><circle cx='32' cy='32' r='20' fill='%23B8860B'/></svg>";
-                                }}
-                              />
+                              {/* Replace image with SVG */}
+                              <svg className="w-16 h-16 animate-bounce" viewBox="0 0 64 64">
+                                <circle cx="32" cy="32" r="30" fill="#FFD700" stroke="#B8860B" strokeWidth="2"/>
+                                <circle cx="32" cy="32" r="20" fill="#B8860B"/>
+                              </svg>
                             </div>
                           </div>
                         ) : (
