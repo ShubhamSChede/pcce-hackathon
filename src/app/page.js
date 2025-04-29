@@ -12,7 +12,7 @@ export default function Home() {
         </h1>
 
         <p className="mt-3 text-2xl">
-          Authentication example with Supabase and Next.js
+          Authentication example with Supabasdddtd Next.js
         </p>
 
         <div className="flex flex-wrap items-center justify-around max-w-4xl mt-6 sm:w-full">
