@@ -476,7 +476,7 @@ DO NOT include weights or other fields - just category, question and options.`
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Based on the following career quiz answers, provide personalized career guidance and suggestions.
+              text: `Based on the following career quiz answers, provide personalized career guidance in a specific format.
               
               ${answersText}
               
@@ -486,13 +486,25 @@ DO NOT include weights or other fields - just category, question and options.`
               And these career paths might be most suitable:
               ${topCareerPaths.map(p => `- ${p.title}: ${p.description}`).join('\n')}
               
-              Give specific, actionable career guidance that:
-              1. Summarizes their work preferences based on their answers
-              2. Explains why the top career paths might suit them
-              3. Suggests 2-3 specific roles they might explore
-              4. Recommends next steps they could take to explore these careers
+              Format your response exactly as follows:
               
-              Make your response conversational, personalized, and encouraging. Keep it under 400 words.`
+              ## Key Skills
+              • List 4-5 skills the person likely has or should develop based on their answers
+              • Keep each bullet point brief (3-5 words)
+              
+              ## Career Interests
+              • List 3-4 broad career areas they seem most interested in
+              • Focus on their evident preferences, not just their top scores
+              
+              ## Qualifications to Consider
+              • List 2-3 specific qualifications, certifications, or educational paths that would help them
+              • Be specific (e.g., "Bachelor's in Computer Science" not just "degree")
+              
+              ## Recommendations
+              • Provide 3-4 actionable, specific next steps they can take
+              • Each should be directly related to exploring or preparing for their top career paths
+              
+              Keep your response concise and focused only on these sections.`
             }]
           }],
           generationConfig: {
