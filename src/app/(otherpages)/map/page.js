@@ -8,9 +8,9 @@ import { Card, Container, Row, Col, Button, Form, Badge, Tabs, Tab, Alert, Progr
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Navbar from '@/components/Navbar';
 
-// Import the marker icons (use dynamic import to avoid SSR issues)
+// Fix the import path for MarkerIcon
 const MapMarker = dynamic(
-  () => import('../../components/MarkerIcon').then(() => import('react-leaflet').then(mod => mod.Marker)),
+  () => import('@/components/MarkerIcon').then(() => import('react-leaflet').then(mod => mod.Marker)),
   { ssr: false }
 );
 

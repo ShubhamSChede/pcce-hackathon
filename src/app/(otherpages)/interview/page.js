@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadarController, RadialLinearScale, PointElement, LineElement } from 'chart.js';
 import { Pie, Bar, Radar } from 'react-chartjs-2';
+import Navbar from '@/components/Navbar';
 
 // Register ChartJS components
 ChartJS.register(
@@ -524,6 +525,7 @@ export default function HRInterviewSimulator() {
 
   return (
     <div className=" bg-gradient-to-b from-indigo-50 to-gray-100 min-h-screen py-8 font-inter">
+      <Navbar/>
       <Head>
         <title>HR Interview Simulator</title>
         <meta name="description" content="Practice your interview skills with AI feedback" />

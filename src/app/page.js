@@ -276,7 +276,7 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-red-500">
+    <div className="relative min-h-screen w-full overflow-hidden">
       {/* Three.js Canvas Background */}
       <canvas
         ref={canvasRef}
@@ -297,7 +297,7 @@ export default function Home() {
 
         <p
           ref={descriptionRef}
-          className="text-xl md:text-2xl text-gray-300 max-w-xl mb-12"
+          className="text-xl md:text-2xl text-gray-900 max-w-xl mb-12"
         >
           Find your dream job and connect with top employers through our professional placement services.
         </p>
@@ -305,16 +305,12 @@ export default function Home() {
         <button
           ref={loginBtnRef}
           onClick={handleLoginClick}
-          className="bg-blue-500 text-white font-bold py-4 px-10 rounded-full text-lg shadow-lg shadow-blue-500/30"
+          className="bg-blue-800 text-white font-bold py-4 px-10 rounded-full text-lg shadow-lg shadow-blue-500/30"
         >
           Explore Opportunities
         </button>
 
         <div ref={signupTextRef} className="mt-8 text-gray-300 text-lg">
-          Are you an employer?{" "}
-          <Link href="" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors duration-300">
-            Post a job opening
-          </Link>
         </div>
       </div>
     </div>
