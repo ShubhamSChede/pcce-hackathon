@@ -509,7 +509,7 @@ export default function JobMarketMap() {
                       </Tab>
                       <Tab eventKey="career" title="Career Roadmap">
                         <div className="p-2">
-                          <h5 className="mb-3 text-primary">Career Progression for {educationLevel === 'bachelors' ? 'Bachelor\'s' : educationLevel === 'masters' ? 'Master\'s' : 'PhD'} Graduates</h5>
+                          <h5 className="mb-3 text-primary">Career Progression for {educationLevel === 'bachelors' ? 'Bachelor&apos;s' : educationLevel === 'masters' ? 'Master&apos;s' : 'PhD'} Graduates</h5>
                           
                           <Row>
                             {careerPaths[educationLevel].map((path, index) => (
@@ -547,7 +547,7 @@ export default function JobMarketMap() {
                 <Card className="shadow h-100">
                   <Card.Body>
                     <Card.Title className="d-flex justify-content-between align-items-center border-bottom pb-2">
-                      <span>In-Demand Skills for {educationLevel === 'bachelors' ? 'Bachelor\'s' : educationLevel === 'masters' ? 'Master\'s' : 'PhD'} Graduates</span>
+                      <span>In-Demand Skills for {educationLevel === 'bachelors' ? 'Bachelor&apos;s' : educationLevel === 'masters' ? 'Master&apos;s' : 'PhD'} Graduates</span>
                       <Badge bg="primary">Relevance Score</Badge>
                     </Card.Title>
                     <div style={{ height: '300px', width: '100%' }}>
@@ -601,7 +601,7 @@ export default function JobMarketMap() {
                 <Card className="shadow mb-4">
                   <Card.Header className="bg-primary text-white">
                     <h5 className="mb-0">
-                      Job Opportunities for {educationLevel === 'bachelors' ? 'Bachelor\'s' : educationLevel === 'masters' ? 'Master\'s' : 'PhD'} 
+                      Job Opportunities for {educationLevel === 'bachelors' ? 'Bachelor&apos;s' : educationLevel === 'masters' ? 'Master&apos;s' : 'PhD'} 
                       Graduates ({careerStage === 'entry' ? 'Entry-Level' : careerStage === 'mid' ? 'Mid-Level' : 'Senior'})
                     </h5>
                   </Card.Header>
@@ -660,7 +660,7 @@ export default function JobMarketMap() {
                       <Col md={8}>
                         <p>
                           Based on current market analysis for {selectedRegion}, graduates with 
-                          {educationLevel === 'bachelors' ? ' Bachelor\'s degrees' : educationLevel === 'masters' ? ' Master\'s degrees' : ' PhDs'} should focus on developing
+                          {educationLevel === 'bachelors' ? ' Bachelor&apos;s degrees' : educationLevel === 'masters' ? ' Master&apos;s degrees' : ' PhDs'} should focus on developing
                           skills in {trendingSkills.slice(0, 3).map(s => s.name).join(', ')} to maximize career opportunities.
                         </p>
                         <p>

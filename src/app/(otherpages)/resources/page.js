@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
+import Image from 'next/image';
 
 export default function ResourcesPage() {
   const [question, setQuestion] = useState('');
@@ -143,7 +144,7 @@ export default function ResourcesPage() {
     const regexPatterns = [
       /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&?/]+)/,
       /youtube\.com\/watch\?.*v=([^&]+)/,
-      /youtube\.com\/shorts\/([^?&/]+)/
+      /youtube\.com\/shorts\/([^?&/]*)/
     ];
     
     for (const pattern of regexPatterns) {
@@ -206,7 +207,7 @@ export default function ResourcesPage() {
         <div className="mb-12 p-6 border border-blue-200 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md">
           <h2 className="text-2xl font-semibold mb-4 text-blue-700">Find Learning Resources</h2>
           <p className="mb-4 text-gray-600">
-            Enter a topic you want to learn about, and we'll find videos, documentation, and tutorials for you.
+            Enter a topic you want to learn about, and we&apos;ll find videos, documentation, and tutorials for you.
           </p>
           
           <form onSubmit={handleTopicSubmit} className="mb-6">
@@ -286,10 +287,13 @@ export default function ResourcesPage() {
                     <div key={index} className="border border-gray-200 rounded-md overflow-hidden bg-white shadow-sm hover:shadow-md transition group">
                       {extractYoutubeVideoId(video.url) ? (
                         <div className="relative aspect-video bg-gray-100">
-                          <img 
+                          <Image 
                             src={`https://img.youtube.com/vi/${extractYoutubeVideoId(video.url)}/mqdefault.jpg`}
                             alt={video.title}
+                            width={320}
+                            height={180}
                             className="w-full h-full object-cover"
+                            unoptimized={true}
                           />
                           <div 
                             className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 cursor-pointer group-hover:bg-opacity-10 transition"

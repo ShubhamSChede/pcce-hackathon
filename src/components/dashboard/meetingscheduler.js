@@ -191,7 +191,7 @@ export default function MeetingScheduler() {
             <h3 className="mt-2 text-lg font-medium text-gray-900">Booking Confirmed!</h3>
             <p className="mt-1 text-sm text-gray-500">
               Thank you for scheduling a meeting with one of our career guidance experts.
-              We'll send a confirmation email to {email} with all the details.
+              We&apos;ll send a confirmation email to {email} with all the details.
             </p>
             <div className="mt-6">
               <button

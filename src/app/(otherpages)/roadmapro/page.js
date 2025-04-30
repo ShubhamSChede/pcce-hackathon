@@ -241,7 +241,7 @@ export default function ProfessionalLearningRoadmap() {
               <div className="bg-white rounded-lg shadow-lg p-8 max-w-3xl mx-auto">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Your Learning Roadmap</h2>
                 <p className="text-gray-600 mb-8">
-                  Enter a topic you want to learn and we'll generate a personalized learning roadmap with curated 
+                  Enter a topic you want to learn and we&apos;ll generate a personalized learning roadmap with curated 
                   resources and assessments to track your progress.
                 </p>
                 
@@ -422,8 +422,8 @@ export default function ProfessionalLearningRoadmap() {
                           </svg>
                         </div>
                         <h2 className="text-xl font-bold text-green-700 mb-2">Congratulations!</h2>
-                        <p className="text-green-600 mb-1">You've completed the entire learning roadmap!</p>
-                        <p className="text-green-600">You're now well-equipped with knowledge in {course}.</p>
+                        <p className="text-green-600 mb-1">You&apos;ve completed the entire learning roadmap!</p>
+                        <p className="text-green-600">You&apos;re now well-equipped with knowledge in {course}.</p>
                       </div>
                     )}
                   </div>
@@ -550,12 +550,12 @@ export default function ProfessionalLearningRoadmap() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <h4 className="text-xl font-bold text-green-700 mb-2">Assessment Passed!</h4>
-                                <p className="text-green-600 mb-4">You've successfully completed this module.</p>
+                                <p className="text-green-600 mb-4">You&apos;ve successfully completed this module.</p>
                                 {currentModule < roadmapData.modules.length - 1 && (
                                   <p className="text-green-600 mb-4">Moving to the next module...</p>
                                 )}
                                 {currentModule === roadmapData.modules.length - 1 && (
-                                  <p className="text-green-600 mb-4">Congratulations! You've completed the entire learning roadmap!</p>
+                                  <p className="text-green-600 mb-4">Congratulations! You&apos;ve completed the entire learning roadmap!</p>
                                 )}
                               </div>
                             ) : (

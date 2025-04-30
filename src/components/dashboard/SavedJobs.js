@@ -224,7 +224,7 @@ export default function SavedJobs() {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="text-center p-8">
           <h1 className="text-xl font-bold text-gray-800 mb-4">No Saved Jobs</h1>
-          <p className="text-gray-600 mb-4">You haven't saved any jobs yet.</p>
+          <p className="text-gray-600 mb-4">You haven&apos;t saved any jobs yet.</p>
           <Link href="/jobs" className="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
             Browse Jobs
           </Link>
