@@ -44,8 +44,31 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50">
       <Navbar/>
       
+      {/* Career Assessment Banner */}
+      <div className=" text-blue-950">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 mt-16">
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <div className="mb-4 md:mb-0">
+              <h2 className="text-xl font-bold flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Discover Your Ideal Career Path
+              </h2>
+              <p className="mt-1 text-indigo-100">Take our comprehensive career assessment test to find your perfect fit</p>
+            </div>
+            <button 
+              onClick={() => router.push('/test')} 
+              className="px-6 py-3 bg-white text-indigo-600 rounded-md font-semibold hover:bg-indigo-100 transition-colors shadow-md"
+            >
+              Take Assessment Test
+            </button>
+          </div>
+        </div>
+      </div>
+      
       {/* Main content area with proper spacing */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 transition-all duration-300">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 pt-8 pb-12 transition-all duration-300">
         
         {/* Dashboard Header */}
         <div className="mb-8">

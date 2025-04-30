@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 
@@ -14,6 +14,63 @@ export default function ResourcesPage() {
   const [error, setError] = useState(null);
   const [resourcesError, setResourcesError] = useState(null);
   const [selectedPreview, setSelectedPreview] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [suggestedTopics, setSuggestedTopics] = useState([]);
+
+  // Get user data from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUserId = localStorage.getItem('user_id');
+      
+      if (storedUserId) {
+        setUserId(storedUserId);
+        
+        // Get user profile data from localStorage
+        try {
+          const skills = JSON.parse(localStorage.getItem(`skills_${storedUserId}`)) || [];
+          const interests = JSON.parse(localStorage.getItem(`interests_${storedUserId}`)) || [];
+          const qualifications = JSON.parse(localStorage.getItem(`qualifications_${storedUserId}`)) || [];
+          
+          // Generate suggested topics based on user profile data
+          generateSuggestedTopics(skills, interests, qualifications);
+        } catch (e) {
+          console.error('Error parsing user profile data:', e);
+        }
+      }
+    }
+  }, []);
+
+  // Function to generate suggested topics based on user profile
+  const generateSuggestedTopics = (skills, interests, qualifications) => {
+    const allTopics = [...skills, ...interests];
+    
+    // Extract relevant keywords from qualifications
+    const educationKeywords = [];
+    for (const qual of qualifications) {
+      // Extract education subjects/fields
+      const keywords = qual.toLowerCase().match(/\b(computer science|engineering|data science|business|marketing|design|psychology|communication|mathematics|physics|biology|chemistry|economics|finance|accounting|law|medicine|nursing|education)\b/g);
+      if (keywords) {
+        educationKeywords.push(...keywords);
+      }
+    }
+    
+    // Combine all potential topic sources
+    let combinedTopics = [...new Set([...allTopics, ...educationKeywords])];
+    
+    // Prioritize the most relevant topics (interests first, then skills, then education fields)
+    combinedTopics = interests
+      .concat(skills.filter(item => !interests.includes(item)))
+      .concat(educationKeywords.filter(item => !interests.includes(item) && !skills.includes(item)));
+    
+    // Limit to 10 suggested topics maximum
+    setSuggestedTopics(combinedTopics.slice(0, 10));
+  };
+
+  // Handle clicking a suggested topic
+  const handleSuggestedTopicClick = (selectedTopic) => {
+    setTopic(selectedTopic);
+    fetchResourcesFromGemini(selectedTopic);
+  };
 
   const fetchHintFromGemini = async (question) => {
     try {
@@ -249,6 +306,42 @@ export default function ResourcesPage() {
               </div>
             </div>
           </form>
+          
+          {/* Suggested Topics Based on User Profile */}
+          {suggestedTopics.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Suggested topics based on your profile:</h3>
+              <div className="flex flex-wrap gap-2">
+                {suggestedTopics.map((suggestedTopic, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSuggestedTopicClick(suggestedTopic)}
+                    className="px-3 py-1.5 bg-white border border-blue-200 rounded-full text-sm text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-colors shadow-sm"
+                  >
+                    {suggestedTopic}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* No Profile Detected Message */}
+          {!userId && !resourcesLoading && !resources && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    Sign in to get personalized topic suggestions based on your profile!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {resourcesError && (
             <div className="p-4 mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-md">
