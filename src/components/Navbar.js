@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -11,6 +11,8 @@ export default function Sidebar({ children }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [userId, setUserId] = useState(null);
+  const [isHovering, setIsHovering] = useState(false);
+  const sidebarRef = useRef(null);
 
   // Handle screen resize to collapse sidebar on small screens
   useEffect(() => {
@@ -72,6 +74,21 @@ export default function Sidebar({ children }) {
     }
   };
 
+  // Handle hover events
+  const handleMouseEnter = () => {
+    if (window.innerWidth >= 768) { // Only expand on hover for desktop
+      setIsHovering(true);
+      setIsCollapsed(false);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (window.innerWidth >= 768) { // Only collapse on leave for desktop
+      setIsHovering(false);
+      setIsCollapsed(true);
+    }
+  };
+
   const NavLink = ({ href, icon, label, requiresSubscription = false }) => {
     // Skip rendering if link requires subscription and user is not subscribed
     if (requiresSubscription && !isSubscribed) {
@@ -90,7 +107,7 @@ export default function Sidebar({ children }) {
         }`}
       >
         {icon}
-        {!isCollapsed && <span className="ml-2 text-sm">{label}</span>}
+        {(!isCollapsed || isHovering) && <span className="ml-2 text-sm">{label}</span>}
       </Link>
     );
   };
@@ -126,23 +143,26 @@ export default function Sidebar({ children }) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar with hover functionality */}
       <aside 
+        ref={sidebarRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         className={`
           fixed inset-y-0 left-0 z-20
           flex flex-col
           bg-white shadow-lg
           transition-all duration-300 ease-in-out
-          ${isCollapsed ? 'w-16' : 'w-60'}
+          ${isCollapsed && !isHovering ? 'w-16' : 'w-60'}
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         {/* Sidebar header */}
         <div className="flex items-center justify-between h-14 px-3 border-b">
-          <Link href="/dashboard" className={`text-lg font-bold text-blue-900 ${isCollapsed ? 'hidden' : 'block'}`}>
+          <Link href="/dashboard" className={`text-lg font-bold text-blue-900 ${isCollapsed && !isHovering ? 'hidden' : 'block'}`}>
             Career Path
           </Link>
-          <Link href="/dashboard" className={`text-lg font-bold text-blue-800 ${isCollapsed ? 'block' : 'hidden'}`}>
+          <Link href="/dashboard" className={`text-lg font-bold text-blue-800 ${isCollapsed && !isHovering ? 'block' : 'hidden'}`}>
             CP
           </Link>
           <button
@@ -156,7 +176,7 @@ export default function Sidebar({ children }) {
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              {isCollapsed ? (
+              {isCollapsed && !isHovering ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               ) : (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -167,7 +187,7 @@ export default function Sidebar({ children }) {
 
         {/* Navigation links */}
         <nav className="flex-1 pt-2 pb-2 overflow-y-auto">
-          <div className={`px-2 ${isCollapsed ? 'space-y-3' : 'space-y-0.5'}`}>
+          <div className={`px-2 ${isCollapsed && !isHovering ? 'space-y-3' : 'space-y-0.5'}`}>
             <NavLink 
               href="/dashboard"
               icon={
@@ -254,7 +274,7 @@ export default function Sidebar({ children }) {
         </nav>
 
         {/* Subscription status indicator */}
-        {!isCollapsed && (
+        {(!isCollapsed || isHovering) && (
           <div className="px-3 py-1.5 mb-1">
             {isSubscribed ? (
               <div className="bg-blue-50 border border-blue-200 rounded-md p-1.5">
@@ -274,12 +294,12 @@ export default function Sidebar({ children }) {
         <div className="border-t border-gray-200 p-2">
           <button
             onClick={handleLogout}
-            className={`flex items-center ${isCollapsed ? 'justify-center' : 'px-2'} py-1.5 w-full rounded-md text-red-600 hover:bg-red-50 transition-colors`}
+            className={`flex items-center ${isCollapsed && !isHovering ? 'justify-center' : 'px-2'} py-1.5 w-full rounded-md text-red-600 hover:bg-red-50 transition-colors`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            {!isCollapsed && <span className="ml-2 text-sm">Logout</span>}
+            {(!isCollapsed || isHovering) && <span className="ml-2 text-sm">Logout</span>}
           </button>
         </div>
       </aside>
@@ -288,7 +308,7 @@ export default function Sidebar({ children }) {
       <main className={`
         flex-1
         transition-all duration-300 ease-in-out
-        ${isCollapsed ? 'md:ml-16' : 'md:ml-60'}
+        ${isCollapsed && !isHovering ? 'md:ml-16' : 'md:ml-60'}
         pt-16 md:pt-0
       `}>
         {children}
