@@ -54,7 +54,7 @@ export default function MeetingScheduler() {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl my-8">
+    <div className=" mx-auto bg-white rounded-xl shadow-md overflow-hidden  my-8">
       <div className="p-8">
         <div className="uppercase tracking-wide text-sm text-blue-800 font-semibold mb-1">
           Career Guidance
