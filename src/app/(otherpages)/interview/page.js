@@ -704,7 +704,7 @@ export default function HRInterviewSimulator() {
             
             <h2 className="text-3xl font-bold text-gray-800 mb-6">Ready to Practice?</h2>
             <p className="text-lg text-gray-600 mb-8">
-              This simulator will present you with common interview questions. You'll speak your answers, 
+              This simulator will present you with common interview questions. You&apos;ll speak your answers, 
               and our AI will analyze your responses and provide detailed feedback.
             </p>
             
@@ -717,7 +717,7 @@ export default function HRInterviewSimulator() {
                 </li>
                 <li className="flex items-start">
                   <span className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center mr-3 mt-1 flex-shrink-0">2</span>
-                  <span>You'll have 2 minutes to respond to each question</span>
+                  <span>You&apos;ll have 2 minutes to respond to each question</span>
                 </li>
                 <li className="flex items-start">
                   <span className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center mr-3 mt-1 flex-shrink-0">3</span>
@@ -878,7 +878,7 @@ export default function HRInterviewSimulator() {
                           ) : (
                             <>
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L11 9.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L9 10.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
                               </svg>
                               Submit Response
                             </>

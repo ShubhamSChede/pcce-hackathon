@@ -428,7 +428,7 @@ export default function JobListings({ userId, interests = [] }) {
                 </div>
                 
                 <div className="mt-2 text-gray-700 bg-blue-50 rounded p-2 text-sm">
-                  <p className="font-medium text-blue-950 mb-1">Why it's a good match:</p>
+                  <p className="font-medium text-blue-950 mb-1">Why it&apos;s a good match:</p>
                   <p>{job.aiMatchReason}</p>
                 </div>
                 
